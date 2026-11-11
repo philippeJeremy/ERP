@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(extra="ignore")
 
     environment: Literal["dev", "test", "prod"] = "dev"
+    app_version: str = "dev"  # injectée dans l'image au build (tag Git)
     log_level: str = "INFO"
 
     # Connexion de l'API : rôle PostgreSQL `erp_app` (lecture/écriture des données, pas de DDL).

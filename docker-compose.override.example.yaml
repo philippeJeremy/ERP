@@ -1,0 +1,40 @@
+# Réglages de DÉVELOPPEMENT. Copier en docker-compose.override.yaml (ignoré par git) :
+# Docker Compose le fusionne automatiquement avec docker-compose.yaml.
+#
+#   - les images sont CONSTRUITES à partir du code local (build:) au lieu d'être
+#     téléchargées depuis ghcr.io → `docker compose up -d --build` ;
+#   - l'API recharge le code à chaque modification (--reload + dossier monté) ;
+#   - API et PostgreSQL accessibles depuis le poste, sur 127.0.0.1 UNIQUEMENT
+#     (jamais 0.0.0.0 : Docker contourne le pare-feu) ;
+#   - Caddy n'est pas démarré (profil « proxy » jamais activé) : il publie ses ports
+#     sur l'IP du VPN 10.8.0.1, qui n'existe pas sur le poste. On parle directement
+#     à l'API. `docker compose build caddy` permet quand même de vérifier son image.
+#   Doc interactive : http://127.0.0.1:8000/docs
+#
+# Dans le .env du poste : ERP_VERSION=dev (images locales, jamais publiées).
+
+services:
+  migrate:
+    build: ./backend
+
+  api:
+    build: ./backend
+    environment:
+      ENVIRONMENT: dev
+      ROOT_PATH: ""
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./backend/app:/app/app
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  worker:
+    build: ./backend
+
+  caddy:
+    build: ./caddy
+    profiles: ["proxy"]
+
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"

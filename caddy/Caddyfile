@@ -1,0 +1,53 @@
+# Configuration de Caddy pour l'ERP.
+# Les {$VARIABLE} sont lues dans l'environnement du conteneur (voir docker-compose.yaml).
+{
+	# Autorité de certification. Pour les essais, mettre dans .env :
+	#   ACME_CA=https://acme-staging-v02.api.letsencrypt.org/directory
+	# (certificats « de test » non reconnus par le navigateur, mais pas de limite de
+	# Let's Encrypt atteinte si on recommence dix fois).
+	acme_ca {$ACME_CA:https://acme-v02.api.letsencrypt.org/directory}
+
+	# Challenge DNS-01 via l'API OVH, pour tous les sites de ce fichier.
+	acme_dns ovh {
+		endpoint {$OVH_ENDPOINT}
+		application_key {$OVH_APPLICATION_KEY}
+		application_secret {$OVH_APPLICATION_SECRET}
+		consumer_key {$OVH_CONSUMER_KEY}
+	}
+}
+
+{$ERP_DOMAIN} {
+	# Compression des réponses.
+	encode zstd gzip
+
+	# En-têtes de sécurité envoyés au navigateur.
+	header {
+		# Toujours HTTPS pour ce domaine pendant 1 an.
+		Strict-Transport-Security "max-age=31536000"
+		# Le navigateur ne « devine » pas le type d'un fichier.
+		X-Content-Type-Options "nosniff"
+		# Interdit d'afficher l'ERP dans une iframe (anti-clickjacking).
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Ne pas annoncer le logiciel serveur.
+		-Server
+	}
+
+	# /api/... → API FastAPI. handle_path RETIRE le préfixe /api avant de transmettre :
+	# /api/auth/login arrive à l'API en /auth/login (d'où ROOT_PATH=/api côté API).
+	handle_path /api/* {
+		reverse_proxy api:8000
+	}
+
+	# Tout le reste → le frontend (à venir). Page provisoire en attendant.
+	handle {
+		header Content-Type "text/plain; charset=utf-8"
+		respond "ERP {$ERP_VERSION} : l'API répond sur /api/health, le frontend arrive bientôt." 200
+	}
+
+	# Journal des accès sur la sortie standard (règle « compatible Kubernetes »).
+	log {
+		output stdout
+		format json
+	}
+}

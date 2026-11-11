@@ -4,7 +4,7 @@ from app.main import app
 
 
 def test_health():
-    assert TestClient(app).get("/health").json() == {"status": "ok"}
+    assert TestClient(app).get("/health").json() == {"status": "ok", "version": "dev"}
 
 
 def test_route_protegee_sans_jeton():

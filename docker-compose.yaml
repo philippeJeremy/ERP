@@ -1,17 +1,20 @@
 # Application ERP. L'infra « serveur » (WireGuard, ufw, DynHost) est sur l'hôte, pas ici.
 #
-#   docker compose up -d --build        démarre tout (les migrations passent d'abord)
-#   docker compose logs -f api          suit les logs de l'API
+# Les images sont construites et publiées par GitHub (workflow « Release », à chaque
+# tag vX.Y.Z) sur ghcr.io. Ce fichier ne fait que les TÉLÉCHARGER, dans la version
+# indiquée par ERP_VERSION (.env) :
+#   docker compose pull && docker compose up -d      (ou : ./server/deploy.sh X.Y.Z)
+#
+# En développement, docker-compose.override.yaml ajoute « build: » pour construire
+# les images localement à partir du code (voir docker-compose.override.example.yaml).
 #
 # Les secrets viennent du fichier .env à la racine (non versionné, modèle : .env.example).
-# Caddy et le frontend seront ajoutés à l'étape suivante.
 
 name: erp
 
 # Bloc commun aux trois services qui utilisent l'image du backend.
 x-backend: &backend
-  build: ./backend
-  image: erp-backend:${ERP_VERSION:-dev}
+  image: ghcr.io/${GHCR_OWNER:?à définir dans .env}/erp-backend:${ERP_VERSION:?à définir dans .env}
   restart: unless-stopped
   environment: &backend-env
     ENVIRONMENT: ${ENVIRONMENT:-prod}
@@ -22,6 +25,33 @@ x-backend: &backend
     ROOT_PATH: /api
 
 services:
+  # Reverse proxy : HTTPS (certificat Let's Encrypt par DNS-01) et routage /api.
+  caddy:
+    image: ghcr.io/${GHCR_OWNER}/erp-caddy:${ERP_VERSION}
+    restart: unless-stopped
+    environment:
+      ERP_DOMAIN: ${OVH_SUBDOMAIN:?à définir dans .env}.${OVH_ZONE:?à définir dans .env}
+      ERP_VERSION: ${ERP_VERSION}
+      ACME_CA: ${ACME_CA:-https://acme-v02.api.letsencrypt.org/directory}
+      OVH_ENDPOINT: ${OVH_ENDPOINT:?à définir dans .env}
+      OVH_APPLICATION_KEY: ${OVH_APPLICATION_KEY:?à définir dans .env}
+      OVH_APPLICATION_SECRET: ${OVH_APPLICATION_SECRET:?à définir dans .env}
+      OVH_CONSUMER_KEY: ${OVH_CONSUMER_KEY:?à définir dans .env}
+    ports:
+      # UNIQUEMENT sur l'IP du VPN : Docker contourne ufw, publier sur 0.0.0.0
+      # exposerait l'ERP sur le réseau local (et sur Internet si la box redirige).
+      - "10.8.0.1:80:80"
+      - "10.8.0.1:443:443"
+      - "10.8.0.1:443:443/udp"   # HTTP/3
+    volumes:
+      # Certificats et clés : à conserver, sinon Caddy redemande un certificat à
+      # chaque redémarrage (et Let's Encrypt limite le nombre de demandes).
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
@@ -34,7 +64,9 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d erp"]  # TCP : pas prêt pendant le script d init
+      # -h 127.0.0.1 (TCP) : pendant le script d'init, PostgreSQL n'écoute que sur
+      # son socket local, donc il n'est pas déclaré « prêt » trop tôt.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d erp"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -90,3 +122,5 @@ services:
 volumes:
   pgdata:
   redisdata:
+  caddy_data:
+  caddy_config:

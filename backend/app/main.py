@@ -16,7 +16,7 @@ modules.load_models()
 
 app = FastAPI(
     title="ERP",
-    version="0.1.0",
+    version=settings.app_version,
     root_path=settings.root_path,
     # Pas de documentation interactive exposée en production.
     docs_url=None if settings.environment == "prod" else "/docs",
@@ -31,7 +31,7 @@ for router in modules.routers():
 @app.get("/health", tags=["Supervision"])
 def health():
     """Liveness : le processus répond. Si KO, Kubernetes redémarre le conteneur."""
-    return {"status": "ok"}
+    return {"status": "ok", "version": settings.app_version}
 
 
 @app.get("/ready", tags=["Supervision"])

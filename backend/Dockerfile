@@ -16,6 +16,11 @@ COPY pyproject.toml ./
 RUN python -c "import tomllib; print('\n'.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))" > /tmp/requirements.txt \
     && pip install -r /tmp/requirements.txt
 
+# Version de l'application, fournie par le workflow de release (tag Git vX.Y.Z).
+# Visible dans /health : on sait toujours quelle version tourne.
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
 # 2) Puis le code.
 COPY app ./app
 COPY alembic ./alembic
