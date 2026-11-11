@@ -1,0 +1,2 @@
+# Outil de lint Python (CI et local), version figée. Mis à jour par Dependabot.
+ruff==0.17.4

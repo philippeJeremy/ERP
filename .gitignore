@@ -1,0 +1,33 @@
+# Secrets et configuration locale — ne JAMAIS versionner
+.env
+.env.*
+!.env.example
+docker-compose.override.yaml
+dynhost.env
+*.key
+wg0.conf
+clients/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/
+.pytest_cache/
+
+# Frontend
+node_modules/
+dist/
+
+# Données et journaux (peuvent contenir des données réelles)
+*.csv
+*.xlsx
+logs/
+*.log
+
+# Outils locaux
+.claude/
+Claude outputs/
+.vscode/
+docs/
+sql/

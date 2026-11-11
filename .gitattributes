@@ -1,0 +1,20 @@
+# Fins de ligne normalisées en LF dans le dépôt ; git les adapte à la sortie
+# selon le poste (CRLF possible sous Windows pour les fichiers texte ordinaires).
+* text=auto
+
+# Scripts exécutés dans les conteneurs Linux : TOUJOURS en LF, même sous Windows.
+# Un entrypoint.sh en CRLF fait planter le conteneur au démarrage
+# (« set: Illegal option - » / « not found »).
+*.sh        text eol=lf
+Dockerfile  text eol=lf
+Caddyfile*  text eol=lf
+*.yaml      text eol=lf
+*.yml       text eol=lf
+
+# Binaires : jamais de conversion.
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.xlsx  binary
+*.xlsm  binary
+*.pdf   binary
