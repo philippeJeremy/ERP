@@ -1,7 +1,6 @@
 {
-  "//": "Permet à VS Code (Pylance) de résoudre `app_common` (dossier shared/) et les imports à plat de chaque service.",
+  "//": "Permet à VS Code (Pylance) de résoudre les imports `app.*` du backend.",
   "executionEnvironments": [
-    { "root": "auth", "extraPaths": ["shared"] },
-    { "root": "shared" }
+    { "root": "backend" }
   ]
 }

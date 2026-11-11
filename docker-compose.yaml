@@ -1,0 +1,92 @@
+# Application ERP. L'infra « serveur » (WireGuard, ufw, DynHost) est sur l'hôte, pas ici.
+#
+#   docker compose up -d --build        démarre tout (les migrations passent d'abord)
+#   docker compose logs -f api          suit les logs de l'API
+#
+# Les secrets viennent du fichier .env à la racine (non versionné, modèle : .env.example).
+# Caddy et le frontend seront ajoutés à l'étape suivante.
+
+name: erp
+
+# Bloc commun aux trois services qui utilisent l'image du backend.
+x-backend: &backend
+  build: ./backend
+  image: erp-backend:${ERP_VERSION:-dev}
+  restart: unless-stopped
+  environment: &backend-env
+    ENVIRONMENT: ${ENVIRONMENT:-prod}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    DATABASE_URL: postgresql+psycopg://erp_app:${ERP_APP_PASSWORD:?à définir dans .env}@postgres:5432/erp
+    REDIS_URL: redis://redis:6379/0
+    JWT_SECRET: ${JWT_SECRET:?à définir dans .env}
+    ROOT_PATH: /api
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?à définir dans .env}
+      # Lus par docker/postgres/init/01-roles.sh au tout premier démarrage.
+      ERP_OWNER_PASSWORD: ${ERP_OWNER_PASSWORD:?à définir dans .env}
+      ERP_APP_PASSWORD: ${ERP_APP_PASSWORD:?à définir dans .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d erp"]  # TCP : pas prêt pendant le script d init
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # Aucun port publié : seuls les conteneurs du réseau Docker peuvent s'y connecter.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]  # la file de tâches survit à un redémarrage
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Job ponctuel : applique les migrations puis s'arrête (futur Job Kubernetes).
+  # C'est le SEUL service qui se connecte avec erp_owner.
+  migrate:
+    <<: *backend
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    environment:
+      <<: *backend-env
+      MIGRATION_DATABASE_URL: postgresql+psycopg://erp_owner:${ERP_OWNER_PASSWORD}@postgres:5432/erp
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready')"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  worker:
+    <<: *backend
+    command: ["arq", "app.workers.main.WorkerSettings"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:

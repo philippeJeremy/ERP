@@ -1,0 +1,68 @@
+# Intégration continue : à chaque push / pull request, lint + tests + build de l'image.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    # PostgreSQL jetable pour les tests d'intégration (RLS, audit, numérotation).
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+
+    env:
+      # Mots de passe jetables, valables uniquement dans ce job.
+      ERP_OWNER_PASSWORD: ci_owner
+      ERP_APP_PASSWORD: ci_app
+      MIGRATION_DATABASE_URL: postgresql+psycopg://erp_owner:ci_owner@localhost:5432/erp
+      DATABASE_URL: postgresql+psycopg://erp_app:ci_app@localhost:5432/erp
+      TEST_MIGRATION_DATABASE_URL: postgresql+psycopg://erp_owner:ci_owner@localhost:5432/erp
+      TEST_DATABASE_URL: postgresql+psycopg://erp_app:ci_app@localhost:5432/erp
+      JWT_SECRET: secret-de-ci-uniquement-0123456789abcdef
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Installer
+        run: pip install ".[dev]"
+
+      - name: Lint (ruff)
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Créer les rôles PostgreSQL (même script qu'en production)
+        run: |
+          sudo apt-get install -y -qq postgresql-client
+          PGPASSWORD=postgres PGHOST=localhost POSTGRES_USER=postgres sh ../docker/postgres/init/01-roles.sh
+
+      - name: Migrations (aller, retour, aller) et cohérence modèles ↔ migrations
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+          alembic check
+
+      - name: Tests
+        run: pytest -q
+
+      - name: Build de l'image Docker
+        run: docker build -t erp-backend:ci .
