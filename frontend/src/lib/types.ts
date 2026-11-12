@@ -37,3 +37,12 @@ export interface Company {
   is_active: boolean
   version: number
 }
+
+export interface SessionInfo {
+  id: string
+  started_at: string
+  last_used_at: string
+  expires_at: string
+  user_agent: string | null
+  current: boolean
+}

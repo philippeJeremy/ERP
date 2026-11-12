@@ -29,6 +29,13 @@
   --border: oklch(0.91 0.008 250);
   --input: oklch(0.88 0.01 250);
   --ring: oklch(0.75 0.15 75);
+
+  /* Barre latérale : même ardoise sombre que le panneau de la page de connexion. */
+  --sidebar: oklch(0.205 0.025 258);
+  --sidebar-foreground: oklch(0.93 0.008 250);
+  --sidebar-muted: oklch(0.66 0.02 255);
+  --sidebar-accent: oklch(0.27 0.03 258);
+  --sidebar-border: oklch(0.29 0.03 258);
 }
 
 @theme inline {
@@ -54,6 +61,11 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
 }
 
 @layer base {

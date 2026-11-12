@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from pydantic import EmailStr, Field
@@ -81,3 +82,23 @@ class RoleAssignment(Schema):
 class PermissionInfo(Schema):
     code: str
     label: str
+
+
+class ProfileUpdate(Schema):
+    full_name: str = Field(min_length=1, max_length=150)
+
+
+class PasswordChange(Schema):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=12, max_length=128)
+
+
+class SessionInfo(Schema):
+    """Une session ouverte (un navigateur / appareil)."""
+
+    id: uuid.UUID  # identifiant de la famille de jetons
+    started_at: datetime  # connexion
+    last_used_at: datetime  # dernier renouvellement
+    expires_at: datetime  # sans activité, fin de la session à cette heure
+    user_agent: str | None
+    current: bool  # la session de ce navigateur

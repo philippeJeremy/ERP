@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -13,11 +14,14 @@ from app.modules.auth import service
 from app.modules.auth.deps import get_context, require, require_superuser
 from app.modules.auth.schemas import (
     Me,
+    PasswordChange,
     PermissionInfo,
+    ProfileUpdate,
     RoleAssignment,
     RoleCreate,
     RolePermissionsUpdate,
     RoleRead,
+    SessionInfo,
     Token,
     UserCreate,
     UserInCompany,
@@ -101,6 +105,54 @@ def logout(response: Response, refresh_token: RefreshCookie = None, db: Session 
 @router.get("/me", response_model=Me)
 def me(db: Session = Depends(get_db), ctx: RequestContext = Depends(get_context)):
     return service.me(db, ctx)
+
+
+# --- Mon profil (aucune société requise) ----------------------------------------
+# Ces routes sont sous /auth : le navigateur y envoie le cookie de session, ce qui
+# permet de reconnaître « la session de ce navigateur ».
+
+
+@router.patch("/me", response_model=UserRead)
+def update_profile(
+    data: ProfileUpdate, db: Session = Depends(get_db), ctx: RequestContext = Depends(get_context)
+):
+    return service.update_profile(db, ctx, data)
+
+
+@router.post("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    data: PasswordChange,
+    refresh_token: RefreshCookie = None,
+    db: Session = Depends(get_db),
+    ctx: RequestContext = Depends(get_context),
+):
+    """Change le mot de passe ; les autres sessions de l'utilisateur sont fermées."""
+    service.change_password(db, ctx, data, refresh_token)
+
+
+@router.get("/me/sessions", response_model=list[SessionInfo])
+def list_sessions(
+    refresh_token: RefreshCookie = None,
+    db: Session = Depends(get_db),
+    ctx: RequestContext = Depends(get_context),
+):
+    return service.list_sessions(db, ctx, refresh_token)
+
+
+@router.post("/me/sessions/revoke-others", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_other_sessions(
+    refresh_token: RefreshCookie = None,
+    db: Session = Depends(get_db),
+    ctx: RequestContext = Depends(get_context),
+):
+    service.revoke_other_sessions(db, ctx, refresh_token)
+
+
+@router.delete("/me/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_session(
+    session_id: uuid.UUID, db: Session = Depends(get_db), ctx: RequestContext = Depends(get_context)
+):
+    service.revoke_session(db, ctx, session_id)
 
 
 @router.get("/permissions", response_model=list[PermissionInfo])

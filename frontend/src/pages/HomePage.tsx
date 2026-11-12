@@ -1,14 +1,29 @@
 import { useQuery } from '@tanstack/react-query'
-import { Building2, KeyRound, Server } from 'lucide-react'
+import { ArrowRight, Building2, Server, UserRound } from 'lucide-react'
+import { Link } from 'react-router'
 
 import { useAuth } from '@/auth/useAuth'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { NAVIGATION } from '@/components/layout/nav'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatDateTime, initials } from '@/lib/format'
+
+const DESCRIPTIONS: Record<string, string> = {
+  Tiers: 'Clients, fournisseurs et groupements, avec adresses de facturation et de livraison.',
+  Ventes: 'Devis, commandes clients et suivi des livraisons.',
+  Achats: 'Commandes fournisseurs et réceptions.',
+  Stock: 'Entrepôts, emplacements et mouvements de stock.',
+  Facturation: 'Factures, avoirs et règlements, numérotés par société.',
+}
+
+const today = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())
 
 function Row({ label, value }: { label: string; value: string | null | undefined }) {
   return (
-    <div className="flex justify-between gap-4 py-1.5 text-sm">
+    <div className="flex justify-between gap-4 py-2 text-sm">
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right font-medium">{value || '—'}</dd>
+      <dd className="truncate text-right font-medium">{value || '—'}</dd>
     </div>
   )
 }
@@ -21,28 +36,84 @@ export function HomePage() {
   })
 
   const roles = me?.companies.find((c) => c.company_id === company?.id)?.roles ?? []
-  const firstName = me?.user.full_name.split(' ')[0]
+  const roleLabel = me?.user.is_superuser ? 'Super-administrateur' : roles.map((r) => r.name).join(', ')
+  const modules = NAVIGATION.find((s) => s.title === 'Gestion')?.items ?? []
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Bonjour {firstName}</h1>
-        <p className="text-sm text-muted-foreground">Les modules métier arrivent bientôt ici.</p>
-      </div>
+    <>
+      <PageHeader
+        title={
+          <>
+            <span className="mb-1 block text-sm font-normal text-muted-foreground first-letter:uppercase">{today}</span>
+            Bonjour {me?.user.full_name.split(' ')[0]}
+          </>
+        }
+        description={[company?.name, roleLabel].filter(Boolean).join(' · ')}
+      />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <section className="space-y-3">
+        <h2 className="text-sm font-medium text-muted-foreground">Modules</h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {modules.map((m) => {
+            const Icon = m.icon
+            return (
+              <div
+                key={m.to}
+                className="group relative flex gap-4 rounded-xl border bg-card p-4 shadow-xs transition-colors"
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
+                  <Icon className="size-5" />
+                </span>
+                <div className="min-w-0 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{m.label}</span>
+                    {m.soon && <Badge variant="accent">bientôt</Badge>}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{DESCRIPTIONS[m.label]}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="mt-10 grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <UserRound className="size-4 text-muted-foreground" /> Mon compte
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="flex size-10 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                {initials(me?.user.full_name)}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-medium">{me?.user.full_name}</p>
+                <p className="truncate text-sm text-muted-foreground">{me?.user.email}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Connecté depuis le {me?.user.last_login_at ? formatDateTime(me.user.last_login_at) : '—'}
+            </p>
+            <Link to="/profil" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+              Gérer mon profil <ArrowRight className="size-3.5" />
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-sm">
               <Building2 className="size-4 text-muted-foreground" /> Société courante
             </CardTitle>
-            <CardDescription>{company?.code}</CardDescription>
           </CardHeader>
           <CardContent>
             <dl className="divide-y">
               <Row label="Raison sociale" value={company?.name} />
+              <Row label="Code" value={company?.code} />
               <Row label="SIREN" value={company?.siren} />
-              <Row label="Ville" value={company?.city} />
               <Row label="Devise" value={company?.currency} />
             </dl>
           </CardContent>
@@ -50,39 +121,19 @@ export function HomePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <KeyRound className="size-4 text-muted-foreground" /> Vos droits
-            </CardTitle>
-            <CardDescription>
-              {me?.user.is_superuser ? 'Super-administrateur' : roles.map((r) => r.name).join(', ') || 'Aucun rôle'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="flex flex-wrap gap-1.5">
-              {me?.permissions.map((p) => (
-                <li key={p} className="rounded-md bg-secondary px-2 py-0.5 font-mono text-xs">
-                  {p === '*' ? 'tous les droits' : p}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
               <Server className="size-4 text-muted-foreground" /> Système
             </CardTitle>
-            <CardDescription>Versions déployées</CardDescription>
           </CardHeader>
           <CardContent>
             <dl className="divide-y">
               <Row label="Interface" value={import.meta.env.VITE_APP_VERSION ?? 'dev'} />
               <Row label="API" value={health.data?.version} />
+              <Row label="Déconnexion après" value={me ? `${me.session_idle_minutes} min d'inactivité` : undefined} />
             </dl>
           </CardContent>
         </Card>
-      </div>
-    </div>
+      </section>
+    </>
   )
 }

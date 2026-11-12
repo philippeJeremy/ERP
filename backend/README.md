@@ -27,6 +27,9 @@ Documentation interactive (dev) : http://127.0.0.1:8000/docs. Utiliser le bouton
   le cookie (rotation). Un ancien jeton rejoué plus de 10 s après son remplacement
   est considéré comme volé : toute la session est révoquée.
 - `POST /auth/logout` révoque la session.
+- Profil : `PATCH /auth/me` (nom), `POST /auth/me/password` (ferme les autres
+  sessions), `GET /auth/me/sessions`, `DELETE /auth/me/sessions/{id}`,
+  `POST /auth/me/sessions/revoke-others`.
 - Les sessions sont en base (`auth.refresh_tokens`, empreinte SHA-256 seulement) ;
   le worker supprime chaque nuit celles expirées depuis 30 jours.
 

@@ -104,3 +104,37 @@ def revoke_family(db: Session, family_id: uuid.UUID, *, reason: str, now: dateti
 def delete_expired_refresh_tokens(db: Session, *, before: datetime) -> int:
     result = db.execute(delete(RefreshToken).where(RefreshToken.expires_at < before))
     return result.rowcount
+
+
+def active_sessions(db: Session, user_id: int, *, now: datetime) -> list[RefreshToken]:
+    """Le jeton en cours de chaque session active (un seul non révoqué par famille)."""
+    query = (
+        select(RefreshToken)
+        .where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.revoked_at.is_(None),
+            RefreshToken.expires_at > now,
+        )
+        .order_by(RefreshToken.created_at.desc())
+    )
+    return list(db.scalars(query))
+
+
+def revoke_user_families(
+    db: Session,
+    user_id: int,
+    *,
+    reason: str,
+    now: datetime,
+    only: uuid.UUID | None = None,
+    keep: uuid.UUID | None = None,
+) -> int:
+    """Révoque les sessions d'un utilisateur : une seule (`only`), ou toutes sauf `keep`."""
+    query = update(RefreshToken).where(
+        RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None)
+    )
+    if only is not None:
+        query = query.where(RefreshToken.family_id == only)
+    if keep is not None:
+        query = query.where(RefreshToken.family_id != keep)
+    return db.execute(query.values(revoked_at=now, revoked_reason=reason)).rowcount

@@ -25,8 +25,11 @@ from app.modules.auth.models import RefreshToken, Role, RolePermission, User, Us
 from app.modules.auth.schemas import (
     CompanyAccess,
     Me,
+    PasswordChange,
+    ProfileUpdate,
     RoleCreate,
     RoleRef,
+    SessionInfo,
     UserCreate,
     UserInCompany,
     UserRead,
@@ -176,6 +179,76 @@ def me(db: Session, ctx: RequestContext) -> Me:
         permissions=permissions,
         session_idle_minutes=get_settings().session_idle_minutes,
     )
+
+
+# --- Mon profil -------------------------------------------------------------------
+
+
+def update_profile(db: Session, ctx: RequestContext, data: ProfileUpdate) -> User:
+    user = repo.get_user(db, ctx.user_id)
+    user.full_name = data.full_name
+    db.commit()
+    return user
+
+
+def _current_family(db: Session, raw_token: str | None) -> uuid.UUID | None:
+    if not raw_token:
+        return None
+    token = repo.get_refresh_token(db, hash_refresh_token(raw_token))
+    return token.family_id if token is not None else None
+
+
+def change_password(
+    db: Session, ctx: RequestContext, data: PasswordChange, raw_token: str | None
+) -> None:
+    """Change le mot de passe et ferme toutes les AUTRES sessions.
+
+    Si le mot de passe a fuité, les sessions ouvertes par l'attaquant tombent ;
+    celle de ce navigateur reste ouverte.
+    """
+    user = repo.get_user(db, ctx.user_id)
+    if not verify_password(data.current_password, user.password_hash):
+        raise DomainError("Mot de passe actuel incorrect", code="mot_de_passe_incorrect")
+    if data.new_password == data.current_password:
+        raise DomainError("Le nouveau mot de passe doit être différent de l'actuel")
+    user.password_hash = hash_password(data.new_password)
+    repo.revoke_user_families(
+        db, user.id, reason="logout", now=datetime.now(UTC), keep=_current_family(db, raw_token)
+    )
+    db.commit()
+
+
+def list_sessions(db: Session, ctx: RequestContext, raw_token: str | None) -> list[SessionInfo]:
+    current = _current_family(db, raw_token)
+    return [
+        SessionInfo(
+            id=t.family_id,
+            started_at=t.session_started_at,
+            last_used_at=t.created_at,
+            expires_at=t.expires_at,
+            user_agent=t.user_agent,
+            current=t.family_id == current,
+        )
+        for t in repo.active_sessions(db, ctx.user_id, now=datetime.now(UTC))
+    ]
+
+
+def revoke_session(db: Session, ctx: RequestContext, family_id: uuid.UUID) -> None:
+    # Le filtre sur user_id empêche de fermer la session de quelqu'un d'autre.
+    count = repo.revoke_user_families(
+        db, ctx.user_id, reason="logout", now=datetime.now(UTC), only=family_id
+    )
+    if count == 0:
+        raise NotFound("Session introuvable")
+    db.commit()
+
+
+def revoke_other_sessions(db: Session, ctx: RequestContext, raw_token: str | None) -> int:
+    count = repo.revoke_user_families(
+        db, ctx.user_id, reason="logout", now=datetime.now(UTC), keep=_current_family(db, raw_token)
+    )
+    db.commit()
+    return count
 
 
 # --- Utilisateurs (dans la société courante) --------------------------------------

@@ -27,9 +27,20 @@ src/
 ├── lib/types.ts          types des réponses de l'API
 ├── auth/                 état de connexion (AuthProvider, useAuth, RequireAuth)
 ├── components/ui/        composants shadcn/ui
-├── components/layout/    cadre de l'application (barre du haut, sélecteur de société)
-└── pages/                une page = un fichier
+├── components/layout/    cadre de l'application : AppLayout, Sidebar, nav.ts (le menu)
+└── pages/                une page = un fichier (accueil, profil, connexion…)
 ```
+
+## Ajouter une page au menu
+
+1. Créer la page dans `src/pages/`.
+2. Ajouter sa route dans `src/router.tsx` (sous `AppLayout`).
+3. Ajouter l'entrée dans `src/components/layout/nav.ts`, avec la `permission` requise :
+   elle est masquée pour les utilisateurs qui n'ont pas ce droit (l'API contrôle
+   quand même chaque requête).
+
+La barre latérale se replie (état mémorisé dans le navigateur) et devient un tiroir
+sur mobile.
 
 ## Sessions et sécurité
 
