@@ -11,7 +11,12 @@ from app.core.context import RequestContext
 from app.core.db import get_db
 from app.modules import all_permissions
 from app.modules.auth import service
-from app.modules.auth.deps import get_context, require, require_superuser
+from app.modules.auth.deps import (
+    get_context,
+    get_context_password_pending,
+    require,
+    require_superuser,
+)
 from app.modules.auth.schemas import (
     Me,
     PasswordChange,
@@ -108,7 +113,7 @@ def logout(response: Response, refresh_token: RefreshCookie = None, db: Session 
 
 
 @router.get("/me", response_model=Me)
-def me(db: Session = Depends(get_db), ctx: RequestContext = Depends(get_context)):
+def me(db: Session = Depends(get_db), ctx: RequestContext = Depends(get_context_password_pending)):
     return service.me(db, ctx)
 
 
@@ -129,7 +134,7 @@ def change_password(
     data: PasswordChange,
     refresh_token: RefreshCookie = None,
     db: Session = Depends(get_db),
-    ctx: RequestContext = Depends(get_context),
+    ctx: RequestContext = Depends(get_context_password_pending),
 ):
     """Change le mot de passe ; les autres sessions de l'utilisateur sont fermées."""
     service.change_password(db, ctx, data, refresh_token)

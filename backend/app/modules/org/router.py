@@ -50,6 +50,16 @@ def update_company(
     return service.update_company(db, ctx, company_id, data)
 
 
+@router.delete("/companies/{company_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_company(
+    company_id: int,
+    db: Session = Depends(get_db),
+    ctx: RequestContext = Depends(require_superuser),
+):
+    """Supprime une société vide. Avec des données : 409, la désactiver à la place."""
+    service.delete_company(db, ctx, company_id)
+
+
 @router.get("/sequences", response_model=list[SequenceRead])
 def list_sequences(db: Session = Depends(get_db), _=Depends(require("org:read"))):
     """Séquences de numérotation de la société courante (en-tête X-Company-Id)."""

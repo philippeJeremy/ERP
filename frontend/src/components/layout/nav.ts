@@ -42,10 +42,9 @@ export const NAVIGATION: NavSection[] = [
   },
   {
     title: 'Administration',
-    permission: 'auth:read',
     items: [
-      { label: 'Utilisateurs et rôles', to: '/admin/utilisateurs', icon: ShieldCheck },
-      { label: 'Société', to: '/admin/societe', icon: Building2, permission: 'org:manage', soon: true },
+      { label: 'Utilisateurs et rôles', to: '/admin/utilisateurs', icon: ShieldCheck, permission: 'auth:read' },
+      { label: 'Sociétés', to: '/admin/societes', icon: Building2, permission: 'org:read' },
     ],
   },
 ]

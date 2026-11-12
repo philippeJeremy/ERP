@@ -52,23 +52,27 @@ export function Sidebar({ collapsed, onToggleCollapsed, onNavigate }: SidebarPro
 
       {/* Navigation */}
       <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-3" aria-label="Navigation principale">
-        {NAVIGATION.filter((s) => !s.permission || can(perms, s.permission)).map((section, i) => (
-          <div key={section.title ?? i} className="space-y-0.5">
-            {section.title &&
-              (collapsed ? (
-                <div className="mx-auto mb-2 h-px w-6 bg-sidebar-border" />
-              ) : (
-                <p className="mb-1.5 px-2.5 text-[11px] font-medium tracking-wider text-sidebar-muted uppercase">
-                  {section.title}
-                </p>
-              ))}
-            {section.items
-              .filter((item) => !item.permission || can(perms, item.permission))
-              .map((item) => (
+        {NAVIGATION.map((section) => ({
+          ...section,
+          items: section.items.filter((item) => !item.permission || can(perms, item.permission)),
+        }))
+          // Une section sans aucune entrée visible n'est pas affichée du tout.
+          .filter((section) => section.items.length > 0 && (!section.permission || can(perms, section.permission)))
+          .map((section, i) => (
+            <div key={section.title ?? i} className="space-y-0.5">
+              {section.title &&
+                (collapsed ? (
+                  <div className="mx-auto mb-2 h-px w-6 bg-sidebar-border" />
+                ) : (
+                  <p className="mb-1.5 px-2.5 text-[11px] font-medium tracking-wider text-sidebar-muted uppercase">
+                    {section.title}
+                  </p>
+                ))}
+              {section.items.map((item) => (
                 <SidebarLink key={item.to} item={item} collapsed={collapsed} onNavigate={onNavigate} />
               ))}
-          </div>
-        ))}
+            </div>
+          ))}
       </nav>
 
       <div className="border-t border-sidebar-border p-3">

@@ -156,6 +156,10 @@ def test_droits_par_societe(client, groupe):
     )
     assert r.status_code == 201, r.text
 
+    with owner_conn() as conn:  # mot de passe provisoire considéré comme déjà changé
+        conn.execute(
+            "UPDATE auth.users SET must_change_password = false WHERE email = %s", (email,)
+        )
     user = login(client, email)
     a = {**user, "X-Company-Id": str(groupe["a"])}
     b = {**user, "X-Company-Id": str(groupe["b"])}

@@ -12,6 +12,8 @@ export interface UserRead {
   full_name: string
   is_active: boolean
   is_superuser: boolean
+  /** Mot de passe provisoire : à changer avant de pouvoir utiliser l'ERP. */
+  must_change_password: boolean
   last_login_at: string | null
 }
 
@@ -31,7 +33,14 @@ export interface Company {
   legal_form: string | null
   siren: string | null
   vat_number: string | null
+  address_line1: string | null
+  address_line2: string | null
+  postal_code: string | null
   city: string | null
+  email: string | null
+  phone: string | null
+  iban: string | null
+  bic: string | null
   country_code: string
   currency: string
   is_active: boolean

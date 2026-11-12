@@ -170,3 +170,9 @@ def role_user_counts(db: Session) -> dict[int, int]:
         UserCompanyRole.role_id, func.count(func.distinct(UserCompanyRole.user_id))
     ).group_by(UserCompanyRole.role_id)
     return {role_id: count for role_id, count in db.execute(query).all()}
+
+
+def revoke_company_access(db: Session, company_id: int) -> int:
+    """Retire tous les rôles attribués dans une société (avant sa suppression)."""
+    result = db.execute(delete(UserCompanyRole).where(UserCompanyRole.company_id == company_id))
+    return result.rowcount

@@ -33,6 +33,18 @@ Documentation interactive (dev) : http://127.0.0.1:8000/docs. Utiliser le bouton
 - Les sessions sont en base (`auth.refresh_tokens`, empreinte SHA-256 seulement) ;
   le worker supprime chaque nuit celles expirées depuis 30 jours.
 
+## Mot de passe provisoire et sociétés
+
+- Un compte créé ou réinitialisé par un administrateur a `must_change_password = true` :
+  tant que l'utilisateur n'a pas choisi son mot de passe (`POST /auth/me/password`),
+  l'API ne lui répond que sur `GET /auth/me` (403 `mot_de_passe_a_changer` ailleurs).
+- Sociétés : `POST /org/companies` et `DELETE /org/companies/{id}` (super-admin),
+  `PATCH /org/companies/{id}` (`org:manage`, société courante ; activation réservée au
+  super-admin). Une société désactivée n'est plus accessible à ses utilisateurs
+  (403 `societe_desactivee`). La suppression ne vaut que pour une société vide : dès
+  qu'elle contient des données, PostgreSQL la refuse (409 `societe_non_vide`) et on
+  la désactive à la place. SIREN unique (409 `siren_existant`).
+
 ## Administration des utilisateurs et des rôles
 
 | Route | Droit | Rôle |

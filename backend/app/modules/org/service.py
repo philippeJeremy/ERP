@@ -2,6 +2,7 @@
 
 from datetime import date
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.context import RequestContext
@@ -11,6 +12,8 @@ from app.modules.auth import public as auth
 from app.modules.org import repository as repo
 from app.modules.org.models import Company, NumberSequence
 from app.modules.org.schemas import CompanyCreate, CompanyUpdate, SequenceUpdate
+
+NOT_NULL_FIELDS = {"name", "country_code", "currency", "is_active"}
 
 # Compteurs créés automatiquement pour chaque nouvelle société.
 DEFAULT_SEQUENCES = [
@@ -22,10 +25,22 @@ DEFAULT_SEQUENCES = [
 ]
 
 
+def _refuse_inactive_company(db: Session, company_id: int) -> None:
+    """Branché sur l'authentification : une société désactivée n'est plus utilisable
+    (sauf par un super-administrateur, qui doit pouvoir la réactiver)."""
+    company = repo.get_company(db, company_id)
+    if company is not None and not company.is_active:
+        raise Forbidden("Cette société est désactivée", code="societe_desactivee")
+
+
+auth.add_company_guard(_refuse_inactive_company)
+
+
 def list_companies_for(db: Session, ctx: RequestContext) -> list[Company]:
     if ctx.is_superuser:
         return repo.list_companies(db)
-    return repo.list_companies(db, auth.company_ids_of(db, ctx.user_id))
+    companies = repo.list_companies(db, auth.company_ids_of(db, ctx.user_id))
+    return [c for c in companies if c.is_active]
 
 
 def get_company(db: Session, ctx: RequestContext, company_id: int) -> Company:
@@ -39,9 +54,22 @@ def get_company(db: Session, ctx: RequestContext, company_id: int) -> Company:
     return company
 
 
+def _ensure_siren_free(db: Session, siren: str | None, company_id: int | None) -> None:
+    """Un SIREN identifie UNE entité juridique : deux sociétés ne peuvent pas le partager."""
+    if not siren:
+        return
+    other = repo.get_company_by_siren(db, siren)
+    if other is not None and other.id != company_id:
+        raise Conflict(
+            f"Le SIREN {siren} est déjà celui de « {other.name} »", code="siren_existant"
+        )
+
+
 def create_company(db: Session, ctx: RequestContext, data: CompanyCreate) -> Company:
     if repo.get_company_by_code(db, data.code):
         raise Conflict(f"Le code société « {data.code} » existe déjà")
+
+    _ensure_siren_free(db, data.siren, None)
 
     company = Company(**data.model_dump())
     db.add(company)
@@ -77,10 +105,51 @@ def update_company(
         )
 
     changes = data.model_dump(exclude_unset=True, exclude={"version"})
+    if (
+        "is_active" in changes
+        and changes["is_active"] != company.is_active
+        and not ctx.is_superuser
+    ):
+        # Sinon un administrateur pourrait couper l'accès à tout le monde, lui compris.
+        raise Forbidden("Seul un super-administrateur peut activer ou désactiver une société")
+    if changes.get("siren"):
+        _ensure_siren_free(db, changes["siren"], company.id)
     for field, value in changes.items():
+        if value is None and field in NOT_NULL_FIELDS:
+            continue  # « null » n'a pas de sens pour ces champs : on ignore
         setattr(company, field, value)
     db.commit()
     return company
+
+
+def delete_company(db: Session, ctx: RequestContext, company_id: int) -> None:
+    """Supprime une société VIDE (créée par erreur, société de test).
+
+    Une société qui a des documents (tiers, commandes, factures…) ne se supprime pas :
+    les factures doivent être conservées 10 ans. PostgreSQL refuse alors la suppression
+    (clés étrangères) et on demande de la désactiver à la place.
+    """
+    company = repo.get_company(db, company_id)
+    if company is None:
+        raise NotFound("Société introuvable")
+    if len(repo.list_companies(db)) == 1:
+        raise Conflict("Impossible de supprimer la dernière société", code="derniere_societe")
+    try:
+        # Les compteurs sont protégés par la RLS : il faut « être » dans la société.
+        set_db_context(db, user_id=ctx.user_id, company_id=company.id)
+        repo.delete_sequences(db, company.id)
+        auth.revoke_company_access(db, company.id)
+        db.delete(company)
+        db.flush()
+    except IntegrityError as exc:
+        db.rollback()
+        raise Conflict(
+            "Cette société contient des données : elle ne peut pas être supprimée. "
+            "Désactivez-la à la place.",
+            code="societe_non_vide",
+        ) from exc
+    set_db_context(db, user_id=ctx.user_id, company_id=None)
+    db.commit()
 
 
 def list_sequences(db: Session) -> list[NumberSequence]:

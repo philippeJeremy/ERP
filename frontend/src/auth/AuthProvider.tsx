@@ -41,10 +41,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 2) Société courante : celle mémorisée si elle est toujours accessible, sinon la première.
   //    Calculée pendant le rendu (pas de state en double), puis mémorisée pour les requêtes.
   const company = companies.find((c) => c.id === companyId) ?? companies[0] ?? null
+  // On fixe ce choix dans l'état (ajustement pendant le rendu, sans effet) : sinon la
+  // société courante changerait toute seule dès qu'une nouvelle société passe en tête de liste.
+  if (companiesQuery.data && company && company.id !== companyId) setCompanyIdState(company.id)
   useEffect(() => {
     if (companiesQuery.data) client.setCompanyId(company?.id ?? null)
   }, [companiesQuery.data, company])
-  const companyReady = !!companiesQuery.data && (company !== null || companies.length === 0)
+  // Si la liste des sociétés est refusée (mot de passe provisoire à changer), on charge
+  // quand même le profil : c'est lui qui dit quoi afficher.
+  const companyReady =
+    (!!companiesQuery.data && (company !== null || companies.length === 0)) || companiesQuery.isError
 
   // 3) L'utilisateur et ses permissions DANS la société courante.
   const meQuery = useQuery({

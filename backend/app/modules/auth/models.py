@@ -28,6 +28,9 @@ class User(Base, BusinessEntity):
     is_active: Mapped[bool] = mapped_column(server_default="true")
     # Super-administrateur : tous les droits partout, crée les sociétés.
     is_superuser: Mapped[bool] = mapped_column(server_default="false")
+    # Mot de passe provisoire (compte créé ou réinitialisé par un administrateur) :
+    # l'utilisateur doit en choisir un nouveau avant de pouvoir utiliser l'ERP.
+    must_change_password: Mapped[bool] = mapped_column(server_default="false")
     last_login_at: Mapped[datetime | None]
 
 

@@ -215,6 +215,7 @@ def change_password(
     if data.new_password == data.current_password:
         raise DomainError("Le nouveau mot de passe doit être différent de l'actuel")
     user.password_hash = hash_password(data.new_password)
+    user.must_change_password = False
     repo.revoke_user_families(
         db, user.id, reason="logout", now=datetime.now(UTC), keep=_current_family(db, raw_token)
     )
@@ -330,6 +331,7 @@ def create_user(db: Session, ctx: RequestContext, data: UserCreate) -> UserInCom
         email=data.email,
         full_name=data.full_name,
         password_hash=hash_password(data.password),
+        must_change_password=True,  # le mot de passe choisi par l'administrateur est provisoire
     )
     db.add(user)
     db.flush()
@@ -383,6 +385,7 @@ def reset_password(db: Session, ctx: RequestContext, user_id: int, new_password:
         raise DomainError("Pour votre propre mot de passe, utilisez votre page de profil")
     _ensure_can_manage_account(db, ctx, user)
     user.password_hash = hash_password(new_password)
+    user.must_change_password = True
     repo.revoke_user_families(db, user.id, reason="logout", now=datetime.now(UTC))
     db.commit()
 

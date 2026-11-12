@@ -82,6 +82,10 @@ let refreshing: Promise<boolean> | null = null
  */
 export function refreshAccessToken(): Promise<boolean> {
   refreshing ??= (async () => {
+    // Si l'utilisateur se connecte PENDANT ce renouvellement (page de connexion ouverte
+    // alors que l'ancien cookie est en cours de vérification), le jeton obtenu par la
+    // connexion est plus récent : un échec ici ne doit pas le déconnecter.
+    const startedAt = lastTokenAt
     try {
       for (let attempt = 0; attempt < 2; attempt++) {
         const r = await fetch(`${API_BASE}/auth/refresh`, { method: 'POST' })
@@ -95,6 +99,7 @@ export function refreshAccessToken(): Promise<boolean> {
         // changé entre-temps) : un second essai utilise le nouveau cookie.
         if (attempt === 0) await sleep(300)
       }
+      if (lastTokenAt !== startedAt) return true
       accessToken = null
       return false
     } finally {

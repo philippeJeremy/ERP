@@ -12,6 +12,7 @@ from app.main import app
 from app.modules.auth.models import User
 from app.modules.org import service as org_service
 from app.modules.org.schemas import CompanyCreate
+from tests.test_multisociete import owner_conn
 
 pytestmark = pytest.mark.db
 PASSWORD = "mot-de-passe-de-test-123"
@@ -84,6 +85,11 @@ def monde(client):
             },
         )
         assert r.status_code == 201, r.text
+        # Ces comptes de test ont « déjà changé » leur mot de passe provisoire.
+        with owner_conn() as conn:
+            conn.execute(
+                "UPDATE auth.users SET must_change_password = false WHERE email = %s", (email,)
+            )
         return {"id": r.json()["id"], "email": email}
 
     gestionnaire_role = role("gestionnaire", ["auth:read", "auth:manage"])
@@ -400,3 +406,58 @@ def test_gestion_des_roles(client, monde):
         ).status_code
         == 403
     )
+
+
+def test_mot_de_passe_provisoire_a_changer(client, monde):
+    """Compte créé ou réinitialisé par un admin : rien n'est accessible avant le changement."""
+    h = login(client, monde["admin"]["email"], monde["a"])
+    email = f"nouvelle-{uid()}@test.fr"
+    r = client.post(
+        "/auth/users",
+        headers=h,
+        json={
+            "email": email,
+            "full_name": "Nouvelle",
+            "password": PASSWORD,
+            "role_ids": [monde["gestionnaire_role"]],
+        },
+    )
+    assert r.json()["must_change_password"] is True
+
+    session = client.post("/auth/login", data={"username": email, "password": PASSWORD})
+    cookie = session.headers.get_list("set-cookie")[0].split(";")[0]
+    new = {
+        "Authorization": f"Bearer {session.json()['access_token']}",
+        "X-Company-Id": str(monde["a"]),
+        "Cookie": cookie,
+    }
+    # Seul /auth/me répond (le frontend en a besoin pour afficher l'écran de changement).
+    assert client.get("/auth/me", headers=new).json()["user"]["must_change_password"] is True
+    for method, url in [
+        ("get", "/auth/users"),
+        ("get", "/org/companies"),
+        ("get", "/auth/me/sessions"),
+        ("get", "/auth/roles"),
+    ]:
+        r = getattr(client, method)(url, headers=new)
+        assert (r.status_code, r.json()["error"]["code"]) == (403, "mot_de_passe_a_changer"), url
+    r = client.patch("/auth/me", headers=new, json={"full_name": "X"})
+    assert r.status_code == 403
+
+    # Changement : tout redevient accessible.
+    r = client.post(
+        "/auth/me/password",
+        headers=new,
+        json={"current_password": PASSWORD, "new_password": "mon-vrai-mot-de-passe-1"},
+    )
+    assert r.status_code == 204
+    assert client.get("/auth/users", headers=new).status_code == 200
+    assert client.get("/auth/me", headers=new).json()["user"]["must_change_password"] is False
+
+    # Une réinitialisation par l'admin remet l'obligation.
+    user_id = client.get("/auth/me", headers=new).json()["user"]["id"]
+    client.post(
+        f"/auth/users/{user_id}/password", headers=h, json={"new_password": "provisoire-numero-2x"}
+    )
+    again = login(client, email, monde["a"], password="provisoire-numero-2x")
+    assert client.get("/auth/users", headers=again).status_code == 403

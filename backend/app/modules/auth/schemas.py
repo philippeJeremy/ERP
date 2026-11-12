@@ -30,6 +30,7 @@ class UserRead(ReadSchema):
     full_name: str
     is_active: bool
     is_superuser: bool
+    must_change_password: bool = False
     last_login_at: datetime | None
 
 
