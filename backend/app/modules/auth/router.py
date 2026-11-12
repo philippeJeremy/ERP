@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends, status
+from typing import Annotated
+
+from fastapi import APIRouter, Cookie, Depends, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.context import RequestContext
 from app.core.db import get_db
 from app.modules import all_permissions
@@ -23,11 +26,72 @@ from app.modules.auth.schemas import (
 router = APIRouter(prefix="/auth", tags=["Authentification et droits"])
 
 
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    s = get_settings()
+    response.set_cookie(
+        key=s.refresh_cookie_name,
+        value=token,
+        max_age=s.refresh_token_days * 24 * 3600,
+        path=s.refresh_cookie_path,
+        httponly=True,  # invisible pour JavaScript
+        secure=s.cookie_secure,  # jamais envoyé en HTTP clair
+        samesite="strict",  # jamais envoyé depuis un autre site (protection CSRF)
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    s = get_settings()
+    response.delete_cookie(
+        key=s.refresh_cookie_name,
+        path=s.refresh_cookie_path,
+        httponly=True,
+        secure=s.cookie_secure,
+        samesite="strict",
+    )
+
+
+RefreshCookie = Annotated[str | None, Cookie(alias=get_settings().refresh_cookie_name)]
+
+
 @router.post("/login", response_model=Token)
-def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+def login(
+    request: Request,
+    response: Response,
+    form: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db),
+):
     """Connexion. Format formulaire OAuth2 (champ `username` = e-mail) : c'est ce qui
-    fait fonctionner le bouton « Authorize » de la documentation Swagger."""
-    return Token(access_token=service.login(db, form.username, form.password))
+    fait fonctionner le bouton « Authorize » de la documentation Swagger.
+
+    Renvoie le jeton d'accès (courte durée) dans la réponse, et pose le refresh token
+    dans un cookie httpOnly."""
+    tokens = service.login(
+        db, form.username, form.password, user_agent=request.headers.get("user-agent")
+    )
+    _set_refresh_cookie(response, tokens.refresh_token)
+    return Token(access_token=tokens.access_token)
+
+
+@router.post("/refresh", response_model=Token)
+def refresh(
+    request: Request,
+    response: Response,
+    refresh_token: RefreshCookie = None,
+    db: Session = Depends(get_db),
+):
+    """Nouveau jeton d'accès à partir du cookie de session (appelé automatiquement par
+    le frontend au chargement de la page et quand le jeton d'accès expire)."""
+    tokens = service.refresh_session(
+        db, refresh_token, user_agent=request.headers.get("user-agent")
+    )
+    _set_refresh_cookie(response, tokens.refresh_token)
+    return Token(access_token=tokens.access_token)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout(response: Response, refresh_token: RefreshCookie = None, db: Session = Depends(get_db)):
+    service.logout(db, refresh_token)
+    _clear_refresh_cookie(response)
 
 
 @router.get("/me", response_model=Me)

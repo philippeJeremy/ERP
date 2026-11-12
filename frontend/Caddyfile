@@ -1,0 +1,25 @@
+# Serveur de fichiers statiques du frontend (à l'intérieur du réseau Docker).
+# Le Caddy principal (HTTPS) lui transmet tout ce qui n'est pas /api/*.
+{
+	admin off
+}
+
+:80 {
+	root * /srv
+	encode zstd gzip
+
+	# Les fichiers de /assets ont une empreinte dans leur nom (index-2TG1AYTd.js) :
+	# ils ne changent jamais, le navigateur peut les garder un an.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+
+	# Tout le reste (index.html) : toujours revalidé, sinon le navigateur garderait
+	# l'ancienne version après un déploiement.
+	@pages not path /assets/*
+	header @pages Cache-Control "no-cache"
+
+	# Application « single page » : /login, /clients/42… n'existent pas en tant que
+	# fichiers. On renvoie index.html, et React affiche la bonne page.
+	try_files {path} /index.html
+	file_server
+}

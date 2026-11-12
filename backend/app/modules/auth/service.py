@@ -1,9 +1,12 @@
 """Règles métier du module auth."""
 
-from datetime import UTC, datetime
+import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.context import RequestContext
 from app.core.db import set_db_context
 from app.core.errors import Conflict, DomainError, Forbidden, NotFound, Unauthorized
@@ -11,12 +14,14 @@ from app.core.security import (
     DUMMY_HASH,
     create_access_token,
     hash_password,
+    hash_refresh_token,
     needs_rehash,
+    new_refresh_token,
     verify_password,
 )
 from app.modules import all_permissions
 from app.modules.auth import repository as repo
-from app.modules.auth.models import Role, RolePermission, User, UserCompanyRole
+from app.modules.auth.models import RefreshToken, Role, RolePermission, User, UserCompanyRole
 from app.modules.auth.schemas import (
     CompanyAccess,
     Me,
@@ -30,7 +35,21 @@ from app.modules.auth.schemas import (
 # --- Connexion -------------------------------------------------------------------
 
 
-def login(db: Session, email: str, password: str) -> str:
+@dataclass(frozen=True)
+class AuthTokens:
+    """Résultat d'une connexion ou d'un renouvellement : les deux jetons."""
+
+    access_token: str
+    refresh_token: str
+
+
+# Délai pendant lequel un jeton tout juste remplacé peut être présenté sans être
+# considéré comme volé : deux onglets qui renouvellent en même temps envoient le même
+# cookie. Le second reçoit un refus simple et réessaie avec le nouveau cookie.
+ROTATION_GRACE = timedelta(seconds=10)
+
+
+def login(db: Session, email: str, password: str, *, user_agent: str | None = None) -> AuthTokens:
     user = repo.get_user_by_email(db, email)
     if user is None:
         verify_password(password, DUMMY_HASH)  # même durée de réponse que pour un vrai compte
@@ -43,8 +62,79 @@ def login(db: Session, email: str, password: str) -> str:
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(password)
     user.last_login_at = datetime.now(UTC)
+    refresh = _issue_refresh_token(db, user.id, family_id=uuid.uuid4(), user_agent=user_agent)
     db.commit()
-    return create_access_token(user.id)
+    return AuthTokens(create_access_token(user.id), refresh)
+
+
+def refresh_session(
+    db: Session, raw_token: str | None, *, user_agent: str | None = None
+) -> AuthTokens:
+    """Échange un refresh token valide contre une nouvelle paire de jetons (rotation)."""
+    if not raw_token:
+        raise Unauthorized("Session absente")
+    now = datetime.now(UTC)
+    token = repo.get_refresh_token(db, hash_refresh_token(raw_token), for_update=True)
+    if token is None:
+        raise Unauthorized("Session inconnue")
+
+    if token.revoked_at is not None:
+        if token.revoked_reason == "rotated" and now - token.revoked_at > ROTATION_GRACE:
+            # Jeton déjà remplacé, rejoué bien plus tard : vol probable.
+            repo.revoke_family(db, token.family_id, reason="reuse", now=now)
+            db.commit()
+        raise Unauthorized("Session expirée, reconnectez-vous")
+
+    if token.expires_at <= now:
+        raise Unauthorized("Session expirée, reconnectez-vous")
+
+    user = repo.get_user(db, token.user_id)
+    if user is None or not user.is_active:
+        repo.revoke_family(db, token.family_id, reason="disabled", now=now)
+        db.commit()
+        raise Unauthorized("Compte désactivé")
+
+    token.revoked_at = now
+    token.revoked_reason = "rotated"
+    refresh = _issue_refresh_token(db, user.id, family_id=token.family_id, user_agent=user_agent)
+    db.commit()
+    return AuthTokens(create_access_token(user.id), refresh)
+
+
+def logout(db: Session, raw_token: str | None) -> None:
+    """Révoque la session (toute la famille de jetons). Sans erreur si elle n'existe pas."""
+    if not raw_token:
+        return
+    token = repo.get_refresh_token(db, hash_refresh_token(raw_token))
+    if token is not None:
+        repo.revoke_family(db, token.family_id, reason="logout", now=datetime.now(UTC))
+        db.commit()
+
+
+def purge_expired_refresh_tokens(db: Session, *, older_than_days: int = 30) -> int:
+    """Supprime les sessions expirées depuis longtemps (tâche planifiée du worker)."""
+    count = repo.delete_expired_refresh_tokens(
+        db, before=datetime.now(UTC) - timedelta(days=older_than_days)
+    )
+    db.commit()
+    return count
+
+
+def _issue_refresh_token(
+    db: Session, user_id: int, *, family_id: uuid.UUID, user_agent: str | None
+) -> str:
+    raw = new_refresh_token()
+    db.add(
+        RefreshToken(
+            user_id=user_id,
+            family_id=family_id,
+            token_hash=hash_refresh_token(raw),
+            expires_at=datetime.now(UTC) + timedelta(days=get_settings().refresh_token_days),
+            user_agent=(user_agent or "")[:255] or None,
+        )
+    )
+    db.flush()
+    return raw
 
 
 def me(db: Session, ctx: RequestContext) -> Me:

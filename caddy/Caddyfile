@@ -39,10 +39,14 @@
 		reverse_proxy api:8000
 	}
 
-	# Tout le reste → le frontend (à venir). Page provisoire en attendant.
+	# Tout le reste → le frontend (application React, conteneur « frontend »).
 	handle {
-		header Content-Type "text/plain; charset=utf-8"
-		respond "ERP {$ERP_VERSION} : l'API répond sur /api/health, le frontend arrive bientôt." 200
+		# Content-Security-Policy : le navigateur n'exécute que les scripts servis par
+		# notre domaine. Même si un attaquant parvenait à injecter du HTML (XSS), son
+		# script ne serait pas exécuté et ne pourrait rien envoyer ailleurs.
+		# (Pas appliquée à /api, dont la doc Swagger charge des fichiers d'un CDN.)
+		header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		reverse_proxy frontend:80
 	}
 
 	# Journal des accès sur la sortie standard (règle « compatible Kubernetes »).

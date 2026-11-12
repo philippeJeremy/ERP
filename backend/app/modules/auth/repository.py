@@ -1,7 +1,10 @@
-from sqlalchemy import delete, func, select
+import uuid
+from datetime import datetime
+
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
-from app.modules.auth.models import Role, RolePermission, User, UserCompanyRole
+from app.modules.auth.models import RefreshToken, Role, RolePermission, User, UserCompanyRole
 
 
 def get_user(db: Session, user_id: int) -> User | None:
@@ -74,4 +77,30 @@ def remove_role(db: Session, user_id: int, company_id: int, role_id: int) -> int
             UserCompanyRole.role_id == role_id,
         )
     )
+    return result.rowcount
+
+
+# --- Sessions (refresh tokens) --------------------------------------------------
+
+
+def get_refresh_token(
+    db: Session, token_hash: str, *, for_update: bool = False
+) -> RefreshToken | None:
+    query = select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+    if for_update:
+        # Deux renouvellements simultanés du même jeton passent l'un après l'autre.
+        query = query.with_for_update()
+    return db.scalar(query)
+
+
+def revoke_family(db: Session, family_id: uuid.UUID, *, reason: str, now: datetime) -> None:
+    db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.family_id == family_id, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=now, revoked_reason=reason)
+    )
+
+
+def delete_expired_refresh_tokens(db: Session, *, before: datetime) -> int:
+    result = db.execute(delete(RefreshToken).where(RefreshToken.expires_at < before))
     return result.rowcount

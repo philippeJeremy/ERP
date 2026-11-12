@@ -6,6 +6,7 @@ ERP modulaire et multi-société : FastAPI + PostgreSQL + Caddy, déployé avec 
 | Dossier | Contenu |
 |---|---|
 | `backend/` | API FastAPI (voir `backend/README.md`) |
+| `frontend/` | Interface React (voir `frontend/README.md`) |
 | `caddy/` | Reverse proxy : image Caddy + module DNS OVH, `Caddyfile` |
 | `docker/` | Scripts d'initialisation des conteneurs (rôles PostgreSQL) |
 | `server/` | Ce qui s'installe sur l'hôte : WireGuard, ufw, DynHost, script de déploiement |
@@ -16,9 +17,11 @@ ERP modulaire et multi-société : FastAPI + PostgreSQL + Caddy, déployé avec 
 ```bash
 cp .env.example .env                                       # puis remplir (ERP_VERSION=dev)
 cp docker-compose.override.example.yaml docker-compose.override.yaml
-docker compose up -d --build                               # images construites depuis le code
+docker compose up -d --build                               # API, base, worker (images locales)
+cd frontend && npm install && npm run dev                  # interface
 ```
-API : http://127.0.0.1:8000/docs (Caddy n'est pas démarré en local).
+Interface : http://localhost:5173 — API : http://127.0.0.1:8000/docs
+(Caddy et le conteneur frontend ne sont pas démarrés en local).
 
 ## Publier une version
 

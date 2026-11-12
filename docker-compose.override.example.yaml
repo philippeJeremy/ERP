@@ -6,10 +6,12 @@
 #   - l'API recharge le code à chaque modification (--reload + dossier monté) ;
 #   - API et PostgreSQL accessibles depuis le poste, sur 127.0.0.1 UNIQUEMENT
 #     (jamais 0.0.0.0 : Docker contourne le pare-feu) ;
-#   - Caddy n'est pas démarré (profil « proxy » jamais activé) : il publie ses ports
-#     sur l'IP du VPN 10.8.0.1, qui n'existe pas sur le poste. On parle directement
-#     à l'API. `docker compose build caddy` permet quand même de vérifier son image.
-#   Doc interactive : http://127.0.0.1:8000/docs
+#   - Caddy et le conteneur frontend ne sont pas démarrés (profil « proxy » jamais
+#     activé) : Caddy publie ses ports sur l'IP du VPN 10.8.0.1, qui n'existe pas
+#     sur le poste. Le frontend tourne avec Vite (rechargement instantané) :
+#       cd frontend && npm install && npm run dev   →  http://localhost:5173
+#     Vite transmet /api/* à l'API, comme Caddy en production.
+#   Doc interactive de l'API : http://127.0.0.1:8000/docs
 #
 # Dans le .env du poste : ERP_VERSION=dev (images locales, jamais publiées).
 
@@ -33,6 +35,10 @@ services:
 
   caddy:
     build: ./caddy
+    profiles: ["proxy"]
+
+  frontend:
+    build: ./frontend
     profiles: ["proxy"]
 
   postgres:

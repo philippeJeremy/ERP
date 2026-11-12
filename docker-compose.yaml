@@ -51,6 +51,14 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      frontend:
+        condition: service_started
+
+  # Interface web : fichiers statiques de l'application React (servis par un petit Caddy).
+  # Aucun port publié : seul le Caddy principal lui parle.
+  frontend:
+    image: ghcr.io/${GHCR_OWNER}/erp-frontend:${ERP_VERSION}
+    restart: unless-stopped
 
   postgres:
     image: postgres:17-alpine

@@ -28,7 +28,18 @@ class Settings(BaseSettings):
 
     jwt_secret: SecretStr
     jwt_algorithm: str = "HS256"
-    access_token_minutes: int = 30
+    # Jeton d'accès court : s'il fuit, il ne sert pas longtemps. Le frontend le
+    # renouvelle tout seul grâce au refresh token.
+    access_token_minutes: int = 15
+
+    # Refresh token : stocké dans un cookie httpOnly (JavaScript ne peut pas le lire,
+    # donc une faille XSS ne permet pas de le voler).
+    refresh_token_days: int = 7
+    refresh_cookie_name: str = "erp_refresh"
+    # Chemin vu par le NAVIGATEUR (avant que Caddy retire /api) : le cookie n'est
+    # envoyé qu'aux routes /api/auth/*, jamais au reste de l'API.
+    refresh_cookie_path: str = "/api/auth"
+    cookie_secure: bool = True  # HTTPS uniquement (localhost est toléré par les navigateurs)
 
     # Préfixe sous lequel Caddy expose l'API (ex. « /api ») : sert à Swagger pour
     # générer les bonnes URL quand le proxy retire ce préfixe.

@@ -81,3 +81,24 @@ jobs:
           -e ERP_DOMAIN=erp.example.com -e OVH_ENDPOINT=ovh-eu
           -e OVH_APPLICATION_KEY=x -e OVH_APPLICATION_SECRET=x -e OVH_CONSUMER_KEY=x
           erp-caddy:ci caddy adapt --config /etc/caddy/Caddyfile > /dev/null
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Installer (versions exactes du package-lock.json)
+        run: npm ci
+      - name: Lint (oxlint)
+        run: npm run lint -- --deny-warnings
+      - name: Vérification des types et build
+        run: npm run build
+      - name: Build de l'image Docker
+        run: docker build -t erp-frontend:ci .

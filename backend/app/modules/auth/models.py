@@ -9,9 +9,10 @@ Les permissions elles-mêmes sont déclarées dans le code (permissions.py de ch
 module) : pas de table à synchroniser, le code est la référence.
 """
 
+import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, ForeignKey, Index, String, Text, func
+from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Identity, Index, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.shared.models import CURRENT_USER_ID, Base, BusinessEntity
@@ -82,3 +83,33 @@ class UserCompanyRole(Base):
     )
 
     role: Mapped[Role] = relationship(lazy="joined")
+
+
+class RefreshToken(Base):
+    """Une session de connexion (un navigateur), renouvelée par rotation.
+
+    À chaque utilisation, le jeton est révoqué et remplacé par un nouveau de la même
+    « famille ». Si un jeton déjà remplacé est présenté à nouveau, c'est qu'il a été
+    volé et rejoué : toute la famille est révoquée (le voleur ET l'utilisateur sont
+    déconnectés, l'utilisateur se reconnecte, le voleur non).
+    """
+
+    __tablename__ = "refresh_tokens"
+    __table_args__ = (
+        CheckConstraint(
+            "revoked_reason IN ('rotated', 'logout', 'reuse', 'disabled')", name="revoked_reason"
+        ),
+        {"schema": "auth"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("auth.users.id", ondelete="CASCADE"), index=True
+    )
+    family_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    expires_at: Mapped[datetime]
+    revoked_at: Mapped[datetime | None]
+    revoked_reason: Mapped[str | None] = mapped_column(String(20))
+    user_agent: Mapped[str | None] = mapped_column(String(255))

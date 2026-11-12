@@ -1,5 +1,7 @@
 """Mots de passe (Argon2id) et jetons JWT."""
 
+import hashlib
+import secrets
 from datetime import UTC, datetime, timedelta
 
 import jwt
@@ -65,3 +67,15 @@ def decode_access_token(token: str) -> int:
     if payload.get("type") != "access":
         raise InvalidTokenError("type de jeton inattendu")
     return int(payload["sub"])
+
+
+def new_refresh_token() -> str:
+    """Jeton aléatoire opaque (256 bits). Ce n'est PAS un JWT : il ne contient rien,
+    il sert seulement de clé pour retrouver la session en base."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_refresh_token(token: str) -> str:
+    """On ne stocke que l'empreinte SHA-256 : une fuite de la base ne donne pas de
+    jetons utilisables. (Argon2 serait inutilement lent : le jeton est déjà aléatoire.)"""
+    return hashlib.sha256(token.encode()).hexdigest()
