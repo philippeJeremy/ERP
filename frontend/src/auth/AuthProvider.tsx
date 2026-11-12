@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 
 import { AuthContext, type AuthContextValue, type Status } from '@/auth/context'
+import { markActivity, useIdleLogout } from '@/auth/useIdleLogout'
 import * as client from '@/lib/api'
 import type { Company, Me } from '@/lib/types'
 
@@ -15,11 +16,13 @@ import type { Company, Me } from '@/lib/types'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const [status, setStatus] = useState<Status>('loading')
+  const [sessionExpired, setSessionExpired] = useState(false)
   const [companyId, setCompanyIdState] = useState<number | null>(client.getCompanyId())
 
   useEffect(() => {
     client.setSessionExpiredHandler(() => {
       queryClient.clear()
+      setSessionExpired(true)
       setStatus('anonymous')
     })
     client.refreshAccessToken().then((ok) => setStatus(ok ? 'authenticated' : 'anonymous'))
@@ -52,6 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     await client.login(email, password)
+    markActivity()
+    setSessionExpired(false)
     setStatus('authenticated')
   }, [])
 
@@ -60,6 +65,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.clear()
     setStatus('anonymous')
   }, [queryClient])
+
+  // Inactivité : on ferme la session côté API (logout) ET on efface l'écran.
+  const logoutForIdle = useCallback(async () => {
+    setSessionExpired(true)
+    await logout()
+  }, [logout])
+  useIdleLogout(authenticated ? meQuery.data?.session_idle_minutes : undefined, logoutForIdle)
 
   const selectCompany = useCallback(
     (id: number) => {
@@ -78,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const value: AuthContextValue = {
     status: effectiveStatus,
+    sessionExpired,
     me: meQuery.data,
     companies,
     company,

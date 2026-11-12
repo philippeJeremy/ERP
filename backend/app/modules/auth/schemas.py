@@ -39,6 +39,8 @@ class Me(Schema):
     # masque les boutons inutiles. Le contrôle réel reste fait par l'API.
     current_company_id: int | None
     permissions: list[str]
+    # Le frontend déconnecte l'écran après ce délai sans activité de l'utilisateur.
+    session_idle_minutes: int
 
 
 class UserCreate(Schema):

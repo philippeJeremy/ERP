@@ -6,6 +6,8 @@ export type Status = 'loading' | 'anonymous' | 'authenticated'
 
 export interface AuthContextValue {
   status: Status
+  /** Vrai si l'utilisateur vient d'être déconnecté pour inactivité ou session expirée. */
+  sessionExpired: boolean
   me: Me | undefined
   companies: Company[]
   company: Company | null

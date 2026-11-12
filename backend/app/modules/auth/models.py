@@ -88,6 +88,10 @@ class UserCompanyRole(Base):
 class RefreshToken(Base):
     """Une session de connexion (un navigateur), renouvelée par rotation.
 
+    Chaque jeton expire après le délai d'inactivité ; le renouvellement repousse
+    l'échéance (expiration « glissante »), sans jamais dépasser la durée maximale
+    de la session.
+
     À chaque utilisation, le jeton est révoqué et remplacé par un nouveau de la même
     « famille ». Si un jeton déjà remplacé est présenté à nouveau, c'est qu'il a été
     volé et rejoué : toute la famille est révoquée (le voleur ET l'utilisateur sont
@@ -109,6 +113,10 @@ class RefreshToken(Base):
     family_id: Mapped[uuid.UUID] = mapped_column(index=True)
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    # Début de la session (la connexion), recopié à chaque rotation : sert à appliquer
+    # la durée maximale de session.
+    session_started_at: Mapped[datetime]
+    # min(maintenant + délai d'inactivité, début de session + durée maximale)
     expires_at: Mapped[datetime]
     revoked_at: Mapped[datetime | None]
     revoked_reason: Mapped[str | None] = mapped_column(String(20))

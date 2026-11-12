@@ -129,3 +129,71 @@ def test_compte_desactive(client, email):
     with owner_conn() as conn:
         conn.execute("UPDATE auth.users SET is_active = false WHERE email = %s", (email,))
     assert call_refresh(client, t1).status_code == 401
+
+
+# --- Durée des sessions : inactivité (30 min) et durée maximale (12 h) --------------
+
+
+def session_row(email: str):
+    with owner_conn() as conn:
+        return conn.execute(
+            "SELECT t.session_started_at, t.expires_at, now() FROM auth.refresh_tokens t "
+            "JOIN auth.users u ON u.id = t.user_id WHERE u.email = %s AND t.revoked_at IS NULL",
+            (email,),
+        ).fetchone()
+
+
+def test_expiration_apres_inactivite(client, email):
+    r = login(client, email)
+    started, expires, now = session_row(email)
+    # Le jeton expire 30 min après sa création (expiration « glissante »).
+    assert 29 * 60 < (expires - now).total_seconds() <= 30 * 60
+    # Le cookie, lui, vit jusqu'à la fin ABSOLUE de la session (12 h).
+    header = next(h for h in r.headers.get_list("set-cookie") if h.startswith("erp_refresh="))
+    assert "max-age=4319" in header.lower() or "max-age=4320" in header.lower()
+
+    # 31 minutes sans aucune requête…
+    with owner_conn() as conn:
+        conn.execute(
+            "UPDATE auth.refresh_tokens SET expires_at = now() - interval '1 minute' "
+            "WHERE user_id = (SELECT id FROM auth.users WHERE email = %s)",
+            (email,),
+        )
+    # … la session est terminée.
+    assert call_refresh(client, refresh_cookie(r)).status_code == 401
+
+
+def test_renouvellement_repousse_l_echeance_sans_depasser_12h(client, email):
+    t = refresh_cookie(login(client, email))
+    # La session a commencé il y a 11 h 50 : il ne reste que 10 minutes.
+    with owner_conn() as conn:
+        conn.execute(
+            "UPDATE auth.refresh_tokens "
+            "SET session_started_at = now() - interval '11 hours 50 minutes' "
+            "WHERE user_id = (SELECT id FROM auth.users WHERE email = %s)",
+            (email,),
+        )
+    r = call_refresh(client, t)
+    assert r.status_code == 200
+    started, expires, now = session_row(email)
+    # Échéance plafonnée à la fin de session (10 min), pas maintenant + 30 min.
+    assert (expires - now).total_seconds() <= 10 * 60 + 5
+
+
+def test_duree_maximale_atteinte(client, email):
+    t = refresh_cookie(login(client, email))
+    # Session commencée il y a 12 h 01, jeton pourtant encore « frais ».
+    with owner_conn() as conn:
+        conn.execute(
+            "UPDATE auth.refresh_tokens "
+            "SET session_started_at = now() - interval '12 hours 1 minute' "
+            "WHERE user_id = (SELECT id FROM auth.users WHERE email = %s)",
+            (email,),
+        )
+    assert call_refresh(client, t).status_code == 401
+
+
+def test_me_indique_le_delai_d_inactivite(client, email):
+    token = login(client, email).json()["access_token"]
+    me = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
+    assert me["session_idle_minutes"] == 30

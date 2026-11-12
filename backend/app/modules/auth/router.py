@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, Request, Response, status
@@ -26,12 +27,15 @@ from app.modules.auth.schemas import (
 router = APIRouter(prefix="/auth", tags=["Authentification et droits"])
 
 
-def _set_refresh_cookie(response: Response, token: str) -> None:
+def _set_refresh_cookie(response: Response, tokens: service.AuthTokens) -> None:
     s = get_settings()
+    # Le navigateur supprime le cookie à la fin absolue de la session. (L'inactivité,
+    # elle, est contrôlée par l'API : expires_at du jeton en base.)
+    remaining = tokens.session_ends_at - datetime.now(UTC)
     response.set_cookie(
         key=s.refresh_cookie_name,
-        value=token,
-        max_age=s.refresh_token_days * 24 * 3600,
+        value=tokens.refresh_token,
+        max_age=max(int(remaining.total_seconds()), 0),
         path=s.refresh_cookie_path,
         httponly=True,  # invisible pour JavaScript
         secure=s.cookie_secure,  # jamais envoyé en HTTP clair
@@ -68,7 +72,7 @@ def login(
     tokens = service.login(
         db, form.username, form.password, user_agent=request.headers.get("user-agent")
     )
-    _set_refresh_cookie(response, tokens.refresh_token)
+    _set_refresh_cookie(response, tokens)
     return Token(access_token=tokens.access_token)
 
 
@@ -84,7 +88,7 @@ def refresh(
     tokens = service.refresh_session(
         db, refresh_token, user_agent=request.headers.get("user-agent")
     )
-    _set_refresh_cookie(response, tokens.refresh_token)
+    _set_refresh_cookie(response, tokens)
     return Token(access_token=tokens.access_token)
 
 

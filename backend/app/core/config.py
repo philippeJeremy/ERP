@@ -34,7 +34,11 @@ class Settings(BaseSettings):
 
     # Refresh token : stocké dans un cookie httpOnly (JavaScript ne peut pas le lire,
     # donc une faille XSS ne permet pas de le voler).
-    refresh_token_days: int = 7
+    # Durée de vie d'une session :
+    #   - inactivité : sans aucune requête pendant ce délai, la session expire ;
+    #   - durée maximale : quoi qu'il arrive, reconnexion au bout de ce délai.
+    session_idle_minutes: int = 30
+    session_max_hours: int = 12
     refresh_cookie_name: str = "erp_refresh"
     # Chemin vu par le NAVIGATEUR (avant que Caddy retire /api) : le cookie n'est
     # envoyé qu'aux routes /api/auth/*, jamais au reste de l'API.

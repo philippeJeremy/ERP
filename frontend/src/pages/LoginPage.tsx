@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertCircle, Eye, EyeOff, LoaderCircle, Lock } from 'lucide-react'
+import { AlertCircle, Clock, Eye, EyeOff, LoaderCircle, Lock } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
@@ -27,7 +27,7 @@ function safeNext(next: string | null): string {
 }
 
 export function LoginPage() {
-  const { status, login } = useAuth()
+  const { status, sessionExpired, login } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [showPassword, setShowPassword] = useState(false)
@@ -92,6 +92,14 @@ export function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+            {sessionExpired && !serverError && (
+              <Alert>
+                <Clock />
+                <AlertDescription>
+                  Votre session a expiré (inactivité ou durée maximale atteinte). Reconnectez-vous pour continuer.
+                </AlertDescription>
+              </Alert>
+            )}
             {serverError && (
               <Alert variant="destructive">
                 <AlertCircle />

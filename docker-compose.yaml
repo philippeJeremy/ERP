@@ -22,6 +22,8 @@ x-backend: &backend
     DATABASE_URL: postgresql+psycopg://erp_app:${ERP_APP_PASSWORD:?à définir dans .env}@postgres:5432/erp
     REDIS_URL: redis://redis:6379/0
     JWT_SECRET: ${JWT_SECRET:?à définir dans .env}
+    SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-30}
+    SESSION_MAX_HOURS: ${SESSION_MAX_HOURS:-12}
     ROOT_PATH: /api
 
 services:

@@ -20,6 +20,8 @@ export interface Me {
   companies: { company_id: number; roles: RoleRef[] }[]
   current_company_id: number | null
   permissions: string[]
+  /** Délai d'inactivité après lequel la session est fermée. */
+  session_idle_minutes: number
 }
 
 export interface Company {

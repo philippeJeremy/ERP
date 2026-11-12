@@ -15,7 +15,13 @@ const API_BASE = '/api'
 const COMPANY_KEY = 'erp.companyId'
 
 let accessToken: string | null = null
+let lastTokenAt = 0 // horodatage du dernier jeton obtenu (connexion ou renouvellement)
 let onSessionExpired: (() => void) | null = null
+
+/** Quand le dernier jeton a été obtenu : sert à renouveler la session d'un utilisateur actif. */
+export function getLastTokenAt(): number {
+  return lastTokenAt
+}
 
 /** Appelé quand la session est définitivement perdue (le frontend repasse sur la page de connexion). */
 export function setSessionExpiredHandler(handler: () => void) {
@@ -81,6 +87,7 @@ export function refreshAccessToken(): Promise<boolean> {
         const r = await fetch(`${API_BASE}/auth/refresh`, { method: 'POST' })
         if (r.ok) {
           accessToken = ((await r.json()) as { access_token: string }).access_token
+          lastTokenAt = Date.now()
           return true
         }
         if (r.status !== 401) break
@@ -106,6 +113,7 @@ export async function login(email: string, password: string): Promise<void> {
   })
   if (!r.ok) throw await toApiError(r)
   accessToken = ((await r.json()) as { access_token: string }).access_token
+  lastTokenAt = Date.now()
 }
 
 export async function logout(): Promise<void> {

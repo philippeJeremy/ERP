@@ -18,7 +18,11 @@ Documentation interactive (dev) : http://127.0.0.1:8000/docs. Utiliser le bouton
 ## Connexion et sessions
 
 - `POST /auth/login` renvoie un **jeton d'accès** JWT (15 min) et pose un **refresh
-  token** dans un cookie `httpOnly` (7 jours, chemin `/api/auth`).
+  token** dans un cookie `httpOnly` (chemin `/api/auth`).
+- **Durée d'une session** (variables `SESSION_IDLE_MINUTES`, `SESSION_MAX_HOURS`) :
+  - **30 min d'inactivité** : sans requête pendant ce délai, la session expire ;
+    chaque renouvellement repousse l'échéance (expiration « glissante ») ;
+  - **12 h maximum** : quoi qu'il arrive, reconnexion au bout de 12 h.
 - `POST /auth/refresh` échange le cookie contre un nouveau jeton d'accès, et remplace
   le cookie (rotation). Un ancien jeton rejoué plus de 10 s après son remplacement
   est considéré comme volé : toute la session est révoquée.

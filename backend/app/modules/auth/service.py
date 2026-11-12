@@ -41,6 +41,7 @@ class AuthTokens:
 
     access_token: str
     refresh_token: str
+    session_ends_at: datetime  # fin absolue de la session (durée de vie du cookie)
 
 
 # Délai pendant lequel un jeton tout juste remplacé peut être présenté sans être
@@ -62,9 +63,12 @@ def login(db: Session, email: str, password: str, *, user_agent: str | None = No
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(password)
     user.last_login_at = datetime.now(UTC)
-    refresh = _issue_refresh_token(db, user.id, family_id=uuid.uuid4(), user_agent=user_agent)
+    started = datetime.now(UTC)
+    refresh = _issue_refresh_token(
+        db, user.id, family_id=uuid.uuid4(), started_at=started, user_agent=user_agent
+    )
     db.commit()
-    return AuthTokens(create_access_token(user.id), refresh)
+    return AuthTokens(create_access_token(user.id), refresh, _session_end(started))
 
 
 def refresh_session(
@@ -85,7 +89,8 @@ def refresh_session(
             db.commit()
         raise Unauthorized("Session expirée, reconnectez-vous")
 
-    if token.expires_at <= now:
+    if token.expires_at <= now or _session_end(token.session_started_at) <= now:
+        # Inactivité trop longue, ou durée maximale de session atteinte.
         raise Unauthorized("Session expirée, reconnectez-vous")
 
     user = repo.get_user(db, token.user_id)
@@ -96,9 +101,15 @@ def refresh_session(
 
     token.revoked_at = now
     token.revoked_reason = "rotated"
-    refresh = _issue_refresh_token(db, user.id, family_id=token.family_id, user_agent=user_agent)
+    refresh = _issue_refresh_token(
+        db,
+        user.id,
+        family_id=token.family_id,
+        started_at=token.session_started_at,
+        user_agent=user_agent,
+    )
     db.commit()
-    return AuthTokens(create_access_token(user.id), refresh)
+    return AuthTokens(create_access_token(user.id), refresh, _session_end(token.session_started_at))
 
 
 def logout(db: Session, raw_token: str | None) -> None:
@@ -120,16 +131,28 @@ def purge_expired_refresh_tokens(db: Session, *, older_than_days: int = 30) -> i
     return count
 
 
+def _session_end(started_at: datetime) -> datetime:
+    return started_at + timedelta(hours=get_settings().session_max_hours)
+
+
 def _issue_refresh_token(
-    db: Session, user_id: int, *, family_id: uuid.UUID, user_agent: str | None
+    db: Session,
+    user_id: int,
+    *,
+    family_id: uuid.UUID,
+    started_at: datetime,
+    user_agent: str | None,
 ) -> str:
+    now = datetime.now(UTC)
+    idle_limit = now + timedelta(minutes=get_settings().session_idle_minutes)
     raw = new_refresh_token()
     db.add(
         RefreshToken(
             user_id=user_id,
             family_id=family_id,
             token_hash=hash_refresh_token(raw),
-            expires_at=datetime.now(UTC) + timedelta(days=get_settings().refresh_token_days),
+            session_started_at=started_at,
+            expires_at=min(idle_limit, _session_end(started_at)),
             user_agent=(user_agent or "")[:255] or None,
         )
     )
@@ -151,6 +174,7 @@ def me(db: Session, ctx: RequestContext) -> Me:
         companies=[CompanyAccess(company_id=c, roles=r) for c, r in by_company.items()],
         current_company_id=ctx.company_id,
         permissions=permissions,
+        session_idle_minutes=get_settings().session_idle_minutes,
     )
 
 

@@ -40,6 +40,11 @@ src/
   Quand une requête reçoit un 401, le jeton est renouvelé puis la requête rejouée.
 - Le refresh token change à chaque utilisation (rotation) ; un ancien jeton rejoué
   plus tard révoque toute la session (vol détecté).
+- **Déconnexion automatique** (`auth/useIdleLogout.ts`) : sans activité (souris,
+  clavier, tactile) dans aucun onglet pendant le délai fixé par l'API (30 min), la
+  session est fermée et l'écran revient à la connexion, avec un message. Un
+  utilisateur actif sans requête (longue saisie) voit sa session renouvelée en
+  arrière-plan. Durée maximale : 12 h, imposée par l'API.
 - En production, Caddy ajoute une `Content-Security-Policy` stricte : seuls les
   scripts servis par le domaine s'exécutent.
 
