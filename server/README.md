@@ -282,6 +282,26 @@ Les appareils n'ont accès **qu'au serveur**, pas au reste du réseau de la mais
 
 ## Étape 5 — Ajouter un appareil (PC, téléphone)
 
+### Deux rôles : utilisateur ou administrateur
+
+Tous les appareils du VPN ne doivent pas avoir les mêmes droits. Un utilisateur de
+l'ERP n'a rien à faire sur le SSH du serveur.
+
+| Rôle    | Commande                            | Plage d'IP              | Accès                |
+|---------|-------------------------------------|-------------------------|----------------------|
+| `user`  | `sudo ./add-client.sh pc-compta`       | `10.8.0.16` à `.254` | Site ERP (80/443)    |
+| `admin` | `sudo ./add-client.sh pc-admin admin`  | `10.8.0.2` à `.15`   | Site ERP **+ SSH**   |
+
+**Comment ça marche :** le rôle décide de l'adresse IP donnée à l'appareil, et le
+pare-feu n'autorise le SSH que depuis la plage admin (`10.8.0.0/28`).
+
+**Un utilisateur peut-il tricher en prenant une IP admin ?** Non. Côté serveur, chaque
+appareil est déclaré avec `AllowedIPs = <son IP>/32` : WireGuard rejette tout paquet
+d'une clé qui n'utilise pas l'adresse qui lui est attribuée. L'IP est liée à la clé.
+
+C'est de la **défense en profondeur** : même avec le port SSH joignable, il faudrait
+encore un compte et une clé SSH. Mais moins une porte est visible, mieux c'est.
+
 **Règle : un appareil = un accès.** On peut ainsi en révoquer un (PC volé, téléphone
 changé) sans toucher aux autres.
 
@@ -296,7 +316,8 @@ echo "server.<domaine>:51820" | sudo tee /etc/wireguard/endpoint
 
 ```bash
 cd ~/server/wireguard
-sudo ./add-client.sh pc-jeremy
+sudo ./add-client.sh pc-jeremy admin     # ton PC : rôle admin
+sudo ./add-client.sh pc-compta           # un utilisateur : rôle user (par défaut)
 ```
 
 **Ce que fait le script :**
@@ -390,7 +411,7 @@ sudo LAN_SUBNET=192.168.1.0/24 ./ufw.sh
 | Tout bloquer en entrée par défaut    | Principe de base : on n'ouvre que ce qui est nécessaire     |
 | Tout autoriser en sortie             | Le serveur doit pouvoir faire ses mises à jour, appeler OVH… |
 | `51820/udp` depuis partout           | La porte du VPN                                             |
-| SSH (22) sur l'interface `wg0`       | Administration uniquement par le VPN                        |
+| SSH (22) sur `wg0`, depuis `10.8.0.0/28` | Administration réservée aux appareils `admin`           |
 | HTTP/HTTPS (80, 443) sur `wg0`       | L'ERP uniquement par le VPN                                 |
 | SSH depuis `192.168.1.0/24`          | **Temporaire** : filet de sécurité pour ne pas s'enfermer dehors |
 
