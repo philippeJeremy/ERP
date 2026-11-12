@@ -53,6 +53,35 @@ class UserCreate(Schema):
 
 class UserInCompany(UserRead):
     roles: list[RoleRef]
+    # Vrai si le compte a aussi accès à d'autres sociétés : seul un super-administrateur
+    # peut alors modifier son identité (nom, e-mail, mot de passe, activation).
+    multi_company: bool = False
+
+
+class UserUpdate(Schema):
+    """Modification partielle d'un compte par un administrateur."""
+
+    full_name: str | None = Field(None, min_length=1, max_length=150)
+    email: EmailStr | None = None
+    is_active: bool | None = None
+
+
+class UserAttach(Schema):
+    """Donner accès à la société courante à un compte qui existe déjà."""
+
+    email: EmailStr
+    role_ids: list[int]
+
+
+class UserRolesUpdate(Schema):
+    """Liste complète des rôles de l'utilisateur dans la société courante.
+    Liste vide = retirer son accès à la société."""
+
+    role_ids: list[int]
+
+
+class PasswordReset(Schema):
+    new_password: str = Field(min_length=12, max_length=128)
 
 
 class RoleCreate(Schema):
@@ -69,6 +98,13 @@ class RoleRead(ReadSchema):
     description: str | None
     is_system: bool
     permissions: list[str] = Field(validation_alias="permission_codes")
+    user_count: int = 0  # nombre d'utilisateurs qui ont ce rôle (toutes sociétés)
+
+
+class RoleUpdate(Schema):
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = None
+    permissions: list[str] | None = None
 
 
 class RolePermissionsUpdate(Schema):

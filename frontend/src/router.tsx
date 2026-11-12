@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router'
 
 import { RequireAuth } from '@/auth/RequireAuth'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { UsersAdminPage } from '@/pages/admin/UsersAdminPage'
 import { HomePage } from '@/pages/HomePage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: 'profil', element: <ProfilePage /> },
+          { path: 'admin/utilisateurs', element: <UsersAdminPage /> },
         ],
       },
     ],

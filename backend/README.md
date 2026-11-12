@@ -33,6 +33,25 @@ Documentation interactive (dev) : http://127.0.0.1:8000/docs. Utiliser le bouton
 - Les sessions sont en base (`auth.refresh_tokens`, empreinte SHA-256 seulement) ;
   le worker supprime chaque nuit celles expirées depuis 30 jours.
 
+## Administration des utilisateurs et des rôles
+
+| Route | Droit | Rôle |
+|---|---|---|
+| `GET /auth/users`, `GET /auth/users/{id}` | `auth:read` | Utilisateurs de la société courante |
+| `POST /auth/users` | `auth:manage` | Créer un compte (au moins un rôle) |
+| `POST /auth/users/attach` | `auth:manage` | Donner accès à la société à un compte existant |
+| `PATCH /auth/users/{id}` | `auth:manage` | Nom, e-mail, activation (désactiver ferme ses sessions) |
+| `POST /auth/users/{id}/password` | `auth:manage` | Réinitialiser le mot de passe (ferme ses sessions) |
+| `PUT /auth/users/{id}/roles` | `auth:manage` | Remplacer ses rôles dans la société (vide = retirer l'accès) |
+| `POST/PATCH/DELETE /auth/roles…` | super-admin | Rôles, communs à tout le groupe |
+
+Règles anti-escalade (dans `auth/service.py`, testées dans `tests/test_admin_utilisateurs.py`) :
+- on n'attribue et on ne retire qu'un rôle dont on possède **toutes** les permissions ;
+- on ne modifie pas ses propres rôles, on ne désactive pas son propre compte ;
+- on ne modifie l'identité ou le mot de passe d'un compte que s'il n'a pas plus de droits
+  que soi et n'a accès qu'à la société courante (sinon : super-administrateur) ;
+- un rôle système, ou encore attribué, ne se supprime pas.
+
 ## Organisation du code
 
 ```

@@ -46,3 +46,24 @@ export interface SessionInfo {
   user_agent: string | null
   current: boolean
 }
+
+export interface UserInCompany extends UserRead {
+  roles: RoleRef[]
+  /** Le compte a aussi accès à d'autres sociétés. */
+  multi_company: boolean
+}
+
+export interface Role {
+  id: number
+  code: string
+  name: string
+  description: string | null
+  is_system: boolean
+  permissions: string[]
+  user_count: number
+}
+
+export interface PermissionInfo {
+  code: string
+  label: string
+}

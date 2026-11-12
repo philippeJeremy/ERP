@@ -15,17 +15,22 @@ from app.modules.auth.deps import get_context, require, require_superuser
 from app.modules.auth.schemas import (
     Me,
     PasswordChange,
+    PasswordReset,
     PermissionInfo,
     ProfileUpdate,
     RoleAssignment,
     RoleCreate,
     RolePermissionsUpdate,
     RoleRead,
+    RoleUpdate,
     SessionInfo,
     Token,
+    UserAttach,
     UserCreate,
     UserInCompany,
     UserRead,
+    UserRolesUpdate,
+    UserUpdate,
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentification et droits"])
@@ -169,13 +174,62 @@ def list_users(db: Session = Depends(get_db), ctx: RequestContext = Depends(requ
     return service.list_users(db, ctx)
 
 
-@router.post("/users", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post("/users", response_model=UserInCompany, status_code=status.HTTP_201_CREATED)
 def create_user(
     data: UserCreate,
     db: Session = Depends(get_db),
     ctx: RequestContext = Depends(require("auth:manage")),
 ):
     return service.create_user(db, ctx, data)
+
+
+@router.post("/users/attach", response_model=UserInCompany, status_code=status.HTTP_201_CREATED)
+def attach_user(
+    data: UserAttach,
+    db: Session = Depends(get_db),
+    ctx: RequestContext = Depends(require("auth:manage")),
+):
+    """Donne accès à la société courante à un compte existant."""
+    return service.attach_user(db, ctx, data)
+
+
+@router.get("/users/{user_id}", response_model=UserInCompany)
+def get_user(
+    user_id: int, db: Session = Depends(get_db), ctx: RequestContext = Depends(require("auth:read"))
+):
+    return service.get_user(db, ctx, user_id)
+
+
+@router.patch("/users/{user_id}", response_model=UserInCompany)
+def update_user(
+    user_id: int,
+    data: UserUpdate,
+    db: Session = Depends(get_db),
+    ctx: RequestContext = Depends(require("auth:manage")),
+):
+    return service.update_user(db, ctx, user_id, data)
+
+
+@router.post("/users/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password(
+    user_id: int,
+    data: PasswordReset,
+    db: Session = Depends(get_db),
+    ctx: RequestContext = Depends(require("auth:manage")),
+):
+    """Réinitialise le mot de passe d'un utilisateur et ferme toutes ses sessions."""
+    service.reset_password(db, ctx, user_id, data.new_password)
+
+
+@router.put("/users/{user_id}/roles", response_model=UserInCompany)
+def set_user_roles(
+    user_id: int,
+    data: UserRolesUpdate,
+    db: Session = Depends(get_db),
+    ctx: RequestContext = Depends(require("auth:manage")),
+):
+    """Remplace les rôles de l'utilisateur dans la société courante."""
+    return service.set_user_roles(db, ctx, user_id, data.role_ids)
 
 
 @router.post("/users/{user_id}/roles", status_code=status.HTTP_204_NO_CONTENT)
@@ -220,3 +274,15 @@ def set_role_permissions(
     _=Depends(require_superuser),
 ):
     return service.set_role_permissions(db, role_id, data.permissions)
+
+
+@router.patch("/roles/{role_id}", response_model=RoleRead)
+def update_role(
+    role_id: int, data: RoleUpdate, db: Session = Depends(get_db), _=Depends(require_superuser)
+):
+    return service.update_role(db, role_id, data)
+
+
+@router.delete("/roles/{role_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_role(role_id: int, db: Session = Depends(get_db), _=Depends(require_superuser)):
+    service.delete_role(db, role_id)

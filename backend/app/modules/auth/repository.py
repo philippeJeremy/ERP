@@ -138,3 +138,35 @@ def revoke_user_families(
     if keep is not None:
         query = query.where(RefreshToken.family_id != keep)
     return db.execute(query.values(revoked_at=now, revoked_reason=reason)).rowcount
+
+
+# --- Administration des utilisateurs et des rôles --------------------------------
+
+
+def roles_in_company(db: Session, user_id: int, company_id: int) -> list[Role]:
+    query = (
+        select(Role)
+        .join(UserCompanyRole, UserCompanyRole.role_id == Role.id)
+        .where(UserCompanyRole.user_id == user_id, UserCompanyRole.company_id == company_id)
+        .order_by(Role.name)
+    )
+    return list(db.scalars(query))
+
+
+def company_counts(db: Session, user_ids: list[int]) -> dict[int, int]:
+    """Nombre de sociétés auxquelles chaque utilisateur a accès."""
+    if not user_ids:
+        return {}
+    query = (
+        select(UserCompanyRole.user_id, func.count(func.distinct(UserCompanyRole.company_id)))
+        .where(UserCompanyRole.user_id.in_(user_ids))
+        .group_by(UserCompanyRole.user_id)
+    )
+    return {user_id: count for user_id, count in db.execute(query).all()}
+
+
+def role_user_counts(db: Session) -> dict[int, int]:
+    query = select(
+        UserCompanyRole.role_id, func.count(func.distinct(UserCompanyRole.user_id))
+    ).group_by(UserCompanyRole.role_id)
+    return {role_id: count for role_id, count in db.execute(query).all()}
