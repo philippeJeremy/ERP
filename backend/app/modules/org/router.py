@@ -13,6 +13,8 @@ from app.modules.org.schemas import (
     CompanyUpdate,
     SequenceRead,
     SequenceUpdate,
+    SiteIn,
+    SiteRead,
     UserCompanyAccess,
 )
 
@@ -83,3 +85,34 @@ def update_sequence(
     _=Depends(require("org:manage")),
 ):
     return service.update_sequence(db, code, data)
+
+
+# --- Dépôts (lieux de livraison, futurs emplacements de stock) -----------------------
+
+
+@router.get("/sites", response_model=list[SiteRead])
+def list_sites(
+    active: bool | None = None,
+    db: Session = Depends(get_db),
+    _: RequestContext = Depends(get_context),
+):
+    """Les dépôts de la société courante (tout utilisateur de la société : ils
+    servent dans les commandes, les livraisons…)."""
+    return service.list_sites(db, active)
+
+
+@router.post("/sites", response_model=SiteRead, status_code=status.HTTP_201_CREATED)
+def create_site(data: SiteIn, db: Session = Depends(get_db), _=Depends(require("org:manage"))):
+    return service.save_site(db, data)
+
+
+@router.put("/sites/{site_id}", response_model=SiteRead)
+def update_site(
+    site_id: int, data: SiteIn, db: Session = Depends(get_db), _=Depends(require("org:manage"))
+):
+    return service.save_site(db, data, site_id)
+
+
+@router.delete("/sites/{site_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_site(site_id: int, db: Session = Depends(get_db), _=Depends(require("org:manage"))):
+    service.delete_site(db, site_id)

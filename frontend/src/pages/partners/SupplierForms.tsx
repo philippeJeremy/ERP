@@ -10,6 +10,7 @@ import { CheckRow, ErrorAlert, Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, Textarea } from '@/components/ui/native-select'
 import { api } from '@/lib/api'
+import { gtinIsValid } from '@/pages/catalog/types'
 import { compact, formatIban, ibanIsValid, PAYMENT_METHODS, type Partner } from '@/pages/partners/types'
 
 // Dans les formulaires, un champ vide est une chaîne vide ; à l'envoi elle devient null.
@@ -118,6 +119,7 @@ const infoSchema = z.object({
   legal_form: text(50),
   siret: z.string().refine((v) => /^(\d{14})?$/.test(compact(v)), '14 chiffres'),
   vat_number: text(20),
+  gln: z.string().refine((v) => v.trim() === '' || (compact(v).length === 13 && gtinIsValid(compact(v))), 'GLN invalide (13 chiffres, clé GS1)'),
   email: z.union([z.literal(''), z.email('Adresse e-mail invalide')]),
   phone: text(30),
   website: text(200),
@@ -131,6 +133,7 @@ const infoDefaults = (p: Partner): InfoValues => ({
   legal_form: p.legal_form ?? '',
   siret: p.siret ?? '',
   vat_number: p.vat_number ?? '',
+  gln: p.gln ?? '',
   email: p.email ?? '',
   phone: p.phone ?? '',
   website: p.website ?? '',
@@ -151,6 +154,7 @@ export function InfoForm({ partner, readOnly }: { partner: Partner; readOnly: bo
         <TextField {...f} name="legal_form" label="Forme juridique" hint="SAS, SARL, SA…" />
         <TextField {...f} name="siret" label="SIRET" mono hint="Identifie l'établissement (14 chiffres)" />
         <TextField {...f} name="vat_number" label="N° de TVA intracommunautaire" mono />
+        <TextField {...f} name="gln" label="GLN" mono hint="Identifiant GS1 de l'entreprise, pour l'EDI" />
       </Section>
       <Section title="Coordonnées" description="Le standard. Les interlocuteurs sont dans l'onglet Contacts.">
         <TextField {...f} name="email" label="E-mail" type="email" />

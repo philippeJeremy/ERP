@@ -42,6 +42,7 @@ class Partner(Base, BusinessEntity, CompanyScopedMixin):
             postgresql_where=text("siret IS NOT NULL"),
         ),
         CheckConstraint("siret ~ '^[0-9]{14}$'", name="siret_format"),
+        CheckConstraint("gln ~ '^[0-9]{13}$'", name="gln_format"),
         CheckConstraint("currency ~ '^[A-Z]{3}$'", name="currency_format"),
         CheckConstraint("is_supplier OR is_customer", name="has_role"),
         CheckConstraint(_in("payment_method", PAYMENT_METHODS), name="payment_method"),
@@ -58,6 +59,8 @@ class Partner(Base, BusinessEntity, CompanyScopedMixin):
     legal_form: Mapped[str | None] = mapped_column(String(50))
     siret: Mapped[str | None] = mapped_column(String(14))
     vat_number: Mapped[str | None] = mapped_column(String(20))
+    # GLN : identifiant GS1 de l'entreprise, utilisé dans les échanges EDI.
+    gln: Mapped[str | None] = mapped_column(String(13))
     is_supplier: Mapped[bool] = mapped_column(server_default="false")
     is_customer: Mapped[bool] = mapped_column(server_default="false")
     # Groupement : la centrale d'achat, la maison mère…
@@ -103,6 +106,7 @@ class PartnerAddress(Base, BusinessEntity, CompanyScopedMixin):
     __table_args__ = (
         CheckConstraint(_in("kind", ADDRESS_KINDS), name="kind"),
         CheckConstraint("country_code ~ '^[A-Z]{2}$'", name="country_code_format"),
+        CheckConstraint("gln ~ '^[0-9]{13}$'", name="gln_format"),
         {"schema": "partners"},
     )
 
@@ -116,6 +120,7 @@ class PartnerAddress(Base, BusinessEntity, CompanyScopedMixin):
     postal_code: Mapped[str] = mapped_column(String(10))
     city: Mapped[str] = mapped_column(String(100))
     country_code: Mapped[str] = mapped_column(String(2), server_default="FR")
+    gln: Mapped[str | None] = mapped_column(String(13))  # GLN du lieu (EDI)
     # Adresse par défaut pour son type (la commande part à l'adresse « commande » principale).
     is_primary: Mapped[bool] = mapped_column(server_default="false")
 

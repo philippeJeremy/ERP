@@ -9,6 +9,8 @@ que la recherche « 2055516 » retrouve le pneu même si le fichier n'avait pas 
 import re
 from decimal import Decimal, InvalidOperation
 
+from app.shared.validators import gtin_is_valid  # noqa: F401  (réexporté)
+
 SPEED_INDEXES = "JKLMNPQRSTUHVWYZ"
 HEAVY_RIMS = {Decimal("17.5"), Decimal("19.5"), Decimal("22.5"), Decimal("24.5")}
 
@@ -137,15 +139,3 @@ def parse_designation(text: str) -> dict:
             result["season"] = season
             break
     return result
-
-
-def gtin_is_valid(code: str) -> bool:
-    """Clé de contrôle des codes-barres EAN-8, UPC-12, EAN-13, GTIN-14 (modulo 10).
-
-    Poids 3 et 1 en alternance, en partant du chiffre juste avant la clé.
-    """
-    if not code.isdigit() or len(code) not in (8, 12, 13, 14):
-        return False
-    body, check = code[:-1], int(code[-1])
-    total = sum(int(d) * (3 if i % 2 == 0 else 1) for i, d in enumerate(reversed(body)))
-    return (10 - total % 10) % 10 == check

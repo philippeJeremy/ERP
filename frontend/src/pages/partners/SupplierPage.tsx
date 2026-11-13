@@ -8,6 +8,7 @@ import {
   LoaderCircle,
   MapPin,
   Power,
+  ShoppingCart,
   Trash2,
   UsersRound,
   type LucideIcon,
@@ -31,6 +32,7 @@ import { api, ApiError } from '@/lib/api'
 import { can } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 import { SupplierArticlesTab } from '@/pages/catalog/SupplierArticlesTab'
+import { NewOrderDialog } from '@/pages/purchasing/PurchaseOrdersPage'
 import { AddressesTab } from '@/pages/partners/AddressesTab'
 import { ContactsTab } from '@/pages/partners/ContactsTab'
 import { InfoForm, TermsForm } from '@/pages/partners/SupplierForms'
@@ -59,6 +61,8 @@ export function SupplierPage() {
   const [params, setParams] = useSearchParams()
   const tab = TABS.find((t) => t.id === params.get('onglet'))?.id ?? 'informations'
   const [deleting, setDeleting] = useState(false)
+  const [ordering, setOrdering] = useState(false)
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const readOnly = !can(me?.permissions, 'partners:manage')
 
@@ -109,6 +113,12 @@ export function SupplierPage() {
             </p>
           </div>
         </div>
+        <div className="flex gap-2">
+        {can(me?.permissions, 'purchasing:manage') && p.is_active && (
+          <Button onClick={() => setOrdering(true)}>
+            <ShoppingCart /> Commander
+          </Button>
+        )}
         {!readOnly && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -127,6 +137,7 @@ export function SupplierPage() {
             </DropdownMenuContent>
           </DropdownMenu>
         )}
+        </div>
       </div>
 
       {/* L'essentiel en un coup d'œil, quel que soit l'onglet. */}
@@ -175,6 +186,7 @@ export function SupplierPage() {
       </div>
 
       {deleting && <DeleteDialog partner={p} onClose={() => setDeleting(false)} />}
+      {ordering && <NewOrderDialog partnerId={p.id} onClose={() => setOrdering(false)} onCreated={(id) => navigate(`/achats/${id}`)} />}
     </>
   )
 }

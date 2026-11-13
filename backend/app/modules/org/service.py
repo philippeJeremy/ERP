@@ -10,13 +10,14 @@ from app.core.db import set_db_context
 from app.core.errors import Conflict, Forbidden, NotFound
 from app.modules.auth import public as auth
 from app.modules.org import repository as repo
-from app.modules.org.models import Company, NumberSequence
+from app.modules.org.models import Company, NumberSequence, Site
 from app.modules.org.schemas import (
     CompanyBrief,
     CompanyCreate,
     CompanyUpdate,
     RoleBrief,
     SequenceUpdate,
+    SiteIn,
     UserCompanyAccess,
 )
 
@@ -31,6 +32,7 @@ DEFAULT_SEQUENCES = [
     ("invoice", "Factures", "FA-{year}-", True),
     ("credit_note", "Avoirs", "AV-{year}-", True),
     ("partner", "Codes tiers", "T", False),  # T00001, T00002… sans remise à zéro
+    ("reception", "Réceptions fournisseur", "BR-{year}-", True),
 ]
 
 
@@ -176,6 +178,7 @@ def delete_company(db: Session, ctx: RequestContext, company_id: int) -> None:
         # Les compteurs sont protégés par la RLS : il faut « être » dans la société.
         set_db_context(db, user_id=ctx.user_id, company_id=company.id)
         repo.delete_sequences(db, company.id)
+        repo.delete_sites(db, company.id)  # bloqué (409) si une commande y est livrée
         auth.revoke_company_access(db, company.id)
         db.delete(company)
         db.flush()
@@ -222,3 +225,54 @@ def next_number(db: Session, code: str, *, today: date | None = None) -> str:
     seq.next_value = value + 1
     db.flush()
     return seq.prefix.replace("{year}", str(year)) + str(value).zfill(seq.padding)
+
+
+# --- Dépôts ------------------------------------------------------------------------
+
+
+def list_sites(db: Session, active: bool | None = None) -> list[Site]:
+    return repo.list_sites(db, active)
+
+
+def get_site(db: Session, site_id: int) -> Site:
+    site = repo.get_site(db, site_id)
+    if site is None:
+        raise NotFound("Dépôt introuvable")
+    return site
+
+
+def save_site(db: Session, data: SiteIn, site_id: int | None = None) -> Site:
+    site = get_site(db, site_id) if site_id else Site()
+    other = repo.get_site_by_code(db, data.code)
+    if other is not None and other.id != site.id:
+        raise Conflict(f"Le code « {data.code} » est déjà utilisé", code="code_existant")
+    for field, value in data.model_dump().items():
+        setattr(site, field, value)
+    if site_id is None:
+        db.add(site)
+    try:
+        db.flush()
+        # Un seul dépôt par défaut ; le premier créé l'est d'office.
+        sites = repo.list_sites(db)
+        if site.is_default or len(sites) == 1:
+            site.is_default = True
+            for s in sites:
+                if s.id != site.id:
+                    s.is_default = False
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise Conflict("Ce GLN est déjà utilisé par un autre dépôt", code="gln_existant") from exc
+    return site
+
+
+def delete_site(db: Session, site_id: int) -> None:
+    site = get_site(db, site_id)
+    try:
+        db.delete(site)
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise Conflict(
+            "Ce dépôt est utilisé par des commandes : désactivez-le plutôt.", code="depot_utilise"
+        ) from exc

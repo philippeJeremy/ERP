@@ -1,6 +1,7 @@
-from pydantic import EmailStr, Field
+from pydantic import EmailStr, Field, field_validator
 
 from app.shared.schemas import ReadSchema, Schema
+from app.shared.validators import clean_gln
 
 
 class CompanyBase(Schema):
@@ -109,3 +110,40 @@ class UserCompanyAccess(Schema):
     grantable_role_ids: list[int]
     extra_permissions: list[str]
     grantable_permissions: list[str]
+
+
+class SiteIn(Schema):
+    code: str = Field(min_length=1, max_length=20, pattern=r"^[A-Z0-9_-]+$")
+    name: str = Field(min_length=1, max_length=100)
+    address_line1: str = Field(min_length=1, max_length=200)
+    address_line2: str | None = Field(None, max_length=200)
+    postal_code: str = Field(min_length=1, max_length=10)
+    city: str = Field(min_length=1, max_length=100)
+    country_code: str = Field("FR", pattern=r"^[A-Z]{2}$")
+    phone: str | None = Field(None, max_length=30)
+    delivery_notes: str | None = None
+    gln: str | None = None
+    is_default: bool = False
+    is_active: bool = True
+
+    @field_validator("gln", mode="before")
+    @classmethod
+    def check_gln(cls, v: str | None) -> str | None:
+        return clean_gln(v)
+
+
+class SiteRead(ReadSchema):
+    id: int
+    code: str
+    name: str
+    address_line1: str
+    address_line2: str | None
+    postal_code: str
+    city: str
+    country_code: str
+    phone: str | None
+    delivery_notes: str | None
+    gln: str | None
+    is_default: bool
+    is_active: bool
+    version: int

@@ -13,6 +13,9 @@ import { ArticlesPage } from '@/pages/catalog/ArticlesPage'
 import { ImportRunPage } from '@/pages/catalog/ImportRunPage'
 import { ImportsPage } from '@/pages/catalog/ImportsPage'
 import { NewImportPage } from '@/pages/catalog/NewImportPage'
+import { SitesPage } from '@/pages/admin/SitesPage'
+import { PurchaseOrderPage } from '@/pages/purchasing/PurchaseOrderPage'
+import { PurchaseOrdersPage } from '@/pages/purchasing/PurchaseOrdersPage'
 import { SupplierPage } from '@/pages/partners/SupplierPage'
 import { SuppliersPage } from '@/pages/partners/SuppliersPage'
 import { ProfilePage } from '@/pages/ProfilePage'
@@ -32,6 +35,9 @@ export const router = createBrowserRouter([
           { path: 'fournisseurs', element: <SuppliersPage /> },
           { path: 'fournisseurs/:id', element: <SupplierPage /> },
           { path: 'articles', element: <ArticlesPage /> },
+          { path: 'achats', element: <PurchaseOrdersPage /> },
+          { path: 'achats/:id', element: <PurchaseOrderPage /> },
+          { path: 'admin/depots', element: <SitesPage /> },
           { path: 'articles/imports', element: <ImportsPage /> },
           { path: 'articles/imports/nouveau', element: <NewImportPage /> },
           { path: 'articles/imports/:id', element: <ImportRunPage /> },

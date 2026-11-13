@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.modules.org.service import DEFAULT_SEQUENCES
 from tests.test_admin_utilisateurs import login, monde, uid  # noqa: F401  (fixture)
 from tests.test_multisociete import owner_conn
 
@@ -35,7 +36,7 @@ def test_creation_et_modification(client, monde):  # noqa: F811
     )
     assert (r.status_code, r.json()["error"]["code"]) == (409, "siren_existant")
     in_new = {**su, "X-Company-Id": str(company["id"])}
-    assert len(client.get("/org/sequences", headers=in_new).json()) == 6
+    assert len(client.get("/org/sequences", headers=in_new).json()) == len(DEFAULT_SEQUENCES)
     assert (
         client.post(
             "/org/companies", headers=su, json={"code": code, "name": "Doublon"}

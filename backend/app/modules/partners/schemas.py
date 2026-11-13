@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import EmailStr, Field, field_validator
 
 from app.shared.schemas import ReadSchema, Schema
+from app.shared.validators import clean_gln
 
 PaymentMethod = Literal["virement", "prelevement", "cheque", "lcr", "carte", "especes"]
 AddressKind = Literal[
@@ -35,6 +36,7 @@ class _PartnerFields(Schema):
     legal_form: str | None = Field(None, max_length=50)
     siret: str | None = None
     vat_number: str | None = Field(None, max_length=20)
+    gln: str | None = None
     parent_id: int | None = None
     email: EmailStr | None = None
     phone: str | None = Field(None, max_length=30)
@@ -54,6 +56,11 @@ class _PartnerFields(Schema):
     @classmethod
     def compact(cls, v: str | None) -> str | None:
         return _compact(v)
+
+    @field_validator("gln", mode="before")
+    @classmethod
+    def check_gln(cls, v: str | None) -> str | None:
+        return clean_gln(v)
 
     @field_validator("siret")
     @classmethod
@@ -113,7 +120,13 @@ class AddressIn(Schema):
     postal_code: str = Field(min_length=1, max_length=10)
     city: str = Field(min_length=1, max_length=100)
     country_code: str = Field("FR", pattern=r"^[A-Z]{2}$")
+    gln: str | None = None
     is_primary: bool = False
+
+    @field_validator("gln", mode="before")
+    @classmethod
+    def check_gln(cls, v: str | None) -> str | None:
+        return clean_gln(v)
 
 
 class AddressRead(ReadSchema):
@@ -125,6 +138,7 @@ class AddressRead(ReadSchema):
     postal_code: str
     city: str
     country_code: str
+    gln: str | None
     is_primary: bool
 
 
@@ -158,6 +172,7 @@ class PartnerRead(ReadSchema):
     legal_form: str | None
     siret: str | None
     vat_number: str | None
+    gln: str | None
     is_supplier: bool
     is_customer: bool
     parent: PartnerRef | None

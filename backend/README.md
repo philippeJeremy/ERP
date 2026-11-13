@@ -133,6 +133,21 @@ modifie jamais les fichiers du fournisseur.
 
 Générer la clé : `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
 
+## Achats (module `purchasing`) et dépôts
+
+- `org.sites` : dépôts de chaque société (adresse de livraison, consignes, GLN, dépôt par
+  défaut). `GET /org/sites` pour tous, écriture `org:manage`.
+- `purchasing.orders` / `order_lines` : brouillon → (à valider) → validée → envoyée →
+  confirmée → partielle / reçue ; clôturée ou annulée. Le numéro `CF-…` est attribué à la
+  validation (`org.next_number`), pas à la création du brouillon. Seuil de validation par
+  société (`purchasing.settings`) : au-delà, `purchasing:approve` requis, et on
+  n'approuve pas sa propre commande.
+- Prix et référence repris du lien article-fournisseur du catalogue ; alertes minimum de
+  commande, franco, article non référencé ou arrêté. Total au centime (arrondi commercial).
+- `receptions` / `reception_lines` (`BR-…`) : quantités reçues par ligne, reliquats,
+  pas de réception au-delà du reste à recevoir.
+- `GET /purchasing/orders/{id}/pdf` : bon de commande généré à la volée (reportlab).
+
 ## Organisation du code
 
 ```

@@ -142,6 +142,8 @@ interface RequestOptions {
   withCompany?: boolean
   /** Société à utiliser pour cette requête (par défaut : la société courante mémorisée). */
   companyId?: number | null
+  /** true : renvoyer le contenu brut (Blob : PDF, fichier) au lieu du JSON. */
+  blob?: boolean
 }
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -175,5 +177,23 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   }
   if (!response.ok) throw await toApiError(response)
   if (response.status === 204) return undefined as T
+  if (options.blob) return (await response.blob()) as T
   return (await response.json()) as T
+}
+
+/** Ouvre un fichier protégé (PDF…) dans un nouvel onglet : un simple lien n'enverrait
+ *  pas le jeton d'accès, on télécharge donc le fichier puis on l'affiche. */
+export async function openFile(path: string): Promise<void> {
+  // Onglet ouvert tout de suite (au clic) : sinon le navigateur le bloquerait.
+  const tab = window.open('', '_blank')
+  try {
+    const blob = await api<Blob>(path, { blob: true })
+    const url = URL.createObjectURL(blob)
+    if (tab) tab.location.href = url
+    else window.location.href = url
+    setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (error) {
+    tab?.close()
+    throw error
+  }
 }

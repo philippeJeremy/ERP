@@ -9,6 +9,7 @@ export interface PartnerAddress {
   postal_code: string
   city: string
   country_code: string
+  gln: string | null
   is_primary: boolean
 }
 
@@ -31,6 +32,7 @@ export interface Partner {
   legal_form: string | null
   siret: string | null
   vat_number: string | null
+  gln: string | null
   is_supplier: boolean
   is_customer: boolean
   parent: { id: number; code: string; name: string } | null

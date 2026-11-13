@@ -20,6 +20,7 @@ from app.main import app
 from app.modules.auth.models import User
 from app.modules.org import service as org_service
 from app.modules.org.schemas import CompanyCreate
+from app.modules.org.service import DEFAULT_SEQUENCES
 
 pytestmark = pytest.mark.db
 PASSWORD = "mot-de-passe-de-test-123"
@@ -82,7 +83,7 @@ def test_chaque_societe_voit_ses_sequences(client, groupe):
     h = login(client, groupe["admin_email"])
     seq_a = client.get("/org/sequences", headers={**h, "X-Company-Id": str(groupe["a"])}).json()
     seq_b = client.get("/org/sequences", headers={**h, "X-Company-Id": str(groupe["b"])}).json()
-    assert len(seq_a) == len(seq_b) == 6
+    assert len(seq_a) == len(seq_b) == len(DEFAULT_SEQUENCES)
     assert {s["id"] for s in seq_a}.isdisjoint({s["id"] for s in seq_b})
 
 

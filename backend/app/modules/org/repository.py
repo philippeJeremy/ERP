@@ -3,7 +3,7 @@
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.modules.org.models import Company, NumberSequence
+from app.modules.org.models import Company, NumberSequence, Site
 
 
 def get_company(db: Session, company_id: int) -> Company | None:
@@ -30,6 +30,10 @@ def delete_sequences(db: Session, company_id: int) -> None:
     db.execute(delete(NumberSequence).where(NumberSequence.company_id == company_id))
 
 
+def delete_sites(db: Session, company_id: int) -> None:
+    db.execute(delete(Site).where(Site.company_id == company_id))
+
+
 # Pas de filtre sur company_id dans les requêtes ci-dessous : la Row-Level Security
 # de PostgreSQL ne renvoie de toute façon que les lignes de la société courante.
 
@@ -45,3 +49,18 @@ def get_sequence(db: Session, code: str, *, for_update: bool = False) -> NumberS
         # attendent leur tour au lieu d'obtenir le même numéro.
         query = query.with_for_update()
     return db.scalar(query)
+
+
+def list_sites(db: Session, active: bool | None = None) -> list[Site]:
+    query = select(Site).order_by(Site.is_default.desc(), Site.name)
+    if active is not None:
+        query = query.where(Site.is_active == active)
+    return list(db.scalars(query))
+
+
+def get_site(db: Session, site_id: int) -> Site | None:
+    return db.get(Site, site_id)
+
+
+def get_site_by_code(db: Session, code: str) -> Site | None:
+    return db.scalar(select(Site).where(Site.code == code))

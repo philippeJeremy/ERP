@@ -5,6 +5,6 @@ validation d'une facture, sans jamais toucher aux tables `org.*` directement.
 """
 
 from app.modules.org.repository import get_company
-from app.modules.org.service import next_number
+from app.modules.org.service import get_site, list_sites, next_number
 
-__all__ = ["get_company", "next_number"]
+__all__ = ["get_company", "get_site", "list_sites", "next_number"]

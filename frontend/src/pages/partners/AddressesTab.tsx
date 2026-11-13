@@ -12,6 +12,7 @@ import { CheckRow, ErrorAlert, Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { api } from '@/lib/api'
+import { gtinIsValid } from '@/pages/catalog/types'
 import { ADDRESS_KINDS, type AddressKind, type Partner, type PartnerAddress } from '@/pages/partners/types'
 
 // Pour un fournisseur, l'adresse « livraison » (clients) est rarement utile : en dernier.
@@ -111,6 +112,7 @@ const schema = z.object({
   postal_code: z.string().trim().min(1, 'Code postal requis').max(10),
   city: z.string().trim().min(1, 'Ville requise').max(100),
   country_code: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/, '2 lettres (FR, BE, DE…)'),
+  gln: z.string().refine((v) => v.trim() === '' || (v.replace(/\s/g, '').length === 13 && gtinIsValid(v.replace(/\s/g, ''))), 'GLN invalide'),
   is_primary: z.boolean(),
 })
 type Values = z.infer<typeof schema>
@@ -128,6 +130,7 @@ function AddressDialog({ partner, address, onClose }: { partner: Partner; addres
       postal_code: address?.postal_code ?? '',
       city: address?.city ?? '',
       country_code: address?.country_code ?? 'FR',
+      gln: address?.gln ?? '',
       is_primary: address?.is_primary ?? false,
     },
   })
@@ -138,7 +141,7 @@ function AddressDialog({ partner, address, onClose }: { partner: Partner; addres
 
   const save = useMutation({
     mutationFn: (v: Values) => {
-      const body = { ...v, label: v.label || null, line2: v.line2 || null }
+      const body = { ...v, label: v.label || null, line2: v.line2 || null, gln: v.gln.replace(/\s/g, '') || null }
       return address
         ? api(`/partners/${partner.id}/addresses/${address.id}`, { method: 'PUT', body })
         : api(`/partners/${partner.id}/addresses`, { method: 'POST', body })
@@ -189,6 +192,9 @@ function AddressDialog({ partner, address, onClose }: { partner: Partner; addres
               <Input id="addr_country" className="font-mono uppercase" autoComplete="off" {...form.register('country_code')} />
             </Field>
           </div>
+          <Field id="addr_gln" label="GLN du lieu (facultatif)" error={errors.gln?.message} hint="Identifiant GS1, pour l'EDI">
+            <Input id="addr_gln" className="font-mono" autoComplete="off" {...form.register('gln')} />
+          </Field>
           <CheckRow
             checked={primary || firstOfKind}
             disabled={firstOfKind}

@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   ShoppingCart,
   Truck,
+  Warehouse,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -39,7 +40,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Articles', to: '/articles', icon: Package, permission: 'catalog:read' },
       { label: 'Clients', to: '/clients', icon: Users, soon: true },
       { label: 'Ventes', to: '/ventes', icon: ShoppingCart, soon: true },
-      { label: 'Achats', to: '/achats', icon: Truck, soon: true },
+      { label: 'Achats', to: '/achats', icon: Truck, permission: 'purchasing:read' },
       { label: 'Stock', to: '/stock', icon: Boxes, soon: true },
       { label: 'Facturation', to: '/facturation', icon: ReceiptText, soon: true },
     ],
@@ -49,6 +50,7 @@ export const NAVIGATION: NavSection[] = [
     items: [
       { label: 'Utilisateurs et rôles', to: '/admin/utilisateurs', icon: ShieldCheck, permission: 'auth:read' },
       { label: 'Sociétés', to: '/admin/societes', icon: Building2, permission: 'org:read' },
+      { label: 'Dépôts', to: '/admin/depots', icon: Warehouse, permission: 'org:read' },
     ],
   },
 ]

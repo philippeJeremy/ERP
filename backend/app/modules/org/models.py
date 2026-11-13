@@ -1,6 +1,6 @@
 """Schéma PostgreSQL `org` : les sociétés (entités juridiques) et leur numérotation."""
 
-from sqlalchemy import BigInteger, CheckConstraint, String, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, Index, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.shared.models import Base, BusinessEntity, CompanyScopedMixin, IdMixin, TimestampMixin
@@ -57,3 +57,31 @@ class NumberSequence(Base, IdMixin, TimestampMixin, CompanyScopedMixin):
     next_value: Mapped[int] = mapped_column(BigInteger, server_default="1")
     reset_yearly: Mapped[bool] = mapped_column(server_default="true")
     current_year: Mapped[int | None]
+
+
+class Site(Base, BusinessEntity, CompanyScopedMixin):
+    """Dépôt (entrepôt, magasin) d'une société : lieu de livraison des achats, et
+    demain emplacement du stock."""
+
+    __tablename__ = "sites"
+    __table_args__ = (
+        UniqueConstraint("company_id", "code"),
+        Index("uq_sites_gln", "gln", unique=True, postgresql_where=text("gln IS NOT NULL")),
+        CheckConstraint("gln ~ '^[0-9]{13}$'", name="gln_format"),
+        CheckConstraint("country_code ~ '^[A-Z]{2}$'", name="country_code_format"),
+        {"schema": "org"},
+    )
+
+    code: Mapped[str] = mapped_column(String(20))
+    name: Mapped[str] = mapped_column(String(100))
+    address_line1: Mapped[str] = mapped_column(String(200))
+    address_line2: Mapped[str | None] = mapped_column(String(200))
+    postal_code: Mapped[str] = mapped_column(String(10))
+    city: Mapped[str] = mapped_column(String(100))
+    country_code: Mapped[str] = mapped_column(String(2), server_default="FR")
+    phone: Mapped[str | None] = mapped_column(String(30))
+    # Consignes pour le transporteur : horaires de réception, quai, accès poids lourds…
+    delivery_notes: Mapped[str | None] = mapped_column(Text)
+    gln: Mapped[str | None] = mapped_column(String(13))
+    is_default: Mapped[bool] = mapped_column(server_default="false")
+    is_active: Mapped[bool] = mapped_column(server_default="true")
