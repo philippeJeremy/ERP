@@ -35,7 +35,7 @@ def test_creation_et_modification(client, monde):  # noqa: F811
     )
     assert (r.status_code, r.json()["error"]["code"]) == (409, "siren_existant")
     in_new = {**su, "X-Company-Id": str(company["id"])}
-    assert len(client.get("/org/sequences", headers=in_new).json()) == 5
+    assert len(client.get("/org/sequences", headers=in_new).json()) == 6
     assert (
         client.post(
             "/org/companies", headers=su, json={"code": code, "name": "Doublon"}

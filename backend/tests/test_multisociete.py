@@ -82,7 +82,7 @@ def test_chaque_societe_voit_ses_sequences(client, groupe):
     h = login(client, groupe["admin_email"])
     seq_a = client.get("/org/sequences", headers={**h, "X-Company-Id": str(groupe["a"])}).json()
     seq_b = client.get("/org/sequences", headers={**h, "X-Company-Id": str(groupe["b"])}).json()
-    assert len(seq_a) == len(seq_b) == 5
+    assert len(seq_a) == len(seq_b) == 6
     assert {s["id"] for s in seq_a}.isdisjoint({s["id"] for s in seq_b})
 
 

@@ -22,13 +22,15 @@ from app.modules.org.schemas import (
 
 NOT_NULL_FIELDS = {"name", "country_code", "currency", "is_active"}
 
-# Compteurs créés automatiquement pour chaque nouvelle société.
+# Compteurs créés automatiquement pour chaque nouvelle société :
+# (code, libellé, préfixe, remise à 1 chaque année ?)
 DEFAULT_SEQUENCES = [
-    ("quote", "Devis", "DV-{year}-"),
-    ("sales_order", "Commandes client", "CC-{year}-"),
-    ("purchase_order", "Commandes fournisseur", "CF-{year}-"),
-    ("invoice", "Factures", "FA-{year}-"),
-    ("credit_note", "Avoirs", "AV-{year}-"),
+    ("quote", "Devis", "DV-{year}-", True),
+    ("sales_order", "Commandes client", "CC-{year}-", True),
+    ("purchase_order", "Commandes fournisseur", "CF-{year}-", True),
+    ("invoice", "Factures", "FA-{year}-", True),
+    ("credit_note", "Avoirs", "AV-{year}-", True),
+    ("partner", "Codes tiers", "T", False),  # T00001, T00002… sans remise à zéro
 ]
 
 
@@ -107,8 +109,16 @@ def create_company(db: Session, ctx: RequestContext, data: CompanyCreate) -> Com
     # sur la nouvelle société, sinon PostgreSQL refuserait l'insertion (WITH CHECK).
     previous_company = ctx.company_id
     set_db_context(db, user_id=ctx.user_id, company_id=company.id)
-    for code, label, prefix in DEFAULT_SEQUENCES:
-        db.add(NumberSequence(company_id=company.id, code=code, label=label, prefix=prefix))
+    for code, label, prefix, reset_yearly in DEFAULT_SEQUENCES:
+        db.add(
+            NumberSequence(
+                company_id=company.id,
+                code=code,
+                label=label,
+                prefix=prefix,
+                reset_yearly=reset_yearly,
+            )
+        )
     db.flush()
     set_db_context(db, user_id=ctx.user_id, company_id=previous_company)
 

@@ -8,9 +8,11 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatDateTime, initials } from '@/lib/format'
+import { can } from '@/lib/permissions'
 
 const DESCRIPTIONS: Record<string, string> = {
-  Tiers: 'Clients, fournisseurs et groupements, avec adresses de facturation et de livraison.',
+  Fournisseurs: 'Référentiel fournisseurs : adresses, contacts, conditions d’achat et banque.',
+  Clients: 'Fiches clients, adresses de facturation et de livraison, conditions de vente.',
   Ventes: 'Devis, commandes clients et suivi des livraisons.',
   Achats: 'Commandes fournisseurs et réceptions.',
   Stock: 'Entrepôts, emplacements et mouvements de stock.',
@@ -56,11 +58,9 @@ export function HomePage() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {modules.map((m) => {
             const Icon = m.icon
-            return (
-              <div
-                key={m.to}
-                className="group relative flex gap-4 rounded-xl border bg-card p-4 shadow-xs transition-colors"
-              >
+            const open = !m.soon && (!m.permission || can(me?.permissions, m.permission))
+            const content = (
+              <>
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
                   <Icon className="size-5" />
                 </span>
@@ -68,9 +68,22 @@ export function HomePage() {
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{m.label}</span>
                     {m.soon && <Badge variant="accent">bientôt</Badge>}
+                    {open && (
+                      <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+                    )}
                   </div>
                   <p className="text-sm text-muted-foreground">{DESCRIPTIONS[m.label]}</p>
                 </div>
+              </>
+            )
+            const className = 'group relative flex gap-4 rounded-xl border bg-card p-4 shadow-xs transition-colors'
+            return open ? (
+              <Link key={m.to} to={m.to} className={`${className} hover:border-primary/40 hover:bg-secondary/40`}>
+                {content}
+              </Link>
+            ) : (
+              <div key={m.to} className={className}>
+                {content}
               </div>
             )
           })}

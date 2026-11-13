@@ -73,6 +73,24 @@ Règles anti-escalade (dans `auth/service.py`, testées dans `tests/test_admin_u
 Droits effectifs dans une société = droits des rôles + droits individuels
 (`auth.user_company_permissions`).
 
+## Tiers (fournisseurs)
+
+Module `partners` : une seule table de tiers avec des rôles (`is_supplier`,
+`is_customer`), propre à chaque société (Row-Level Security). Code automatique `T00001`
+(compteur `partner` de `org.number_sequences`, sans remise à zéro annuelle).
+
+| Route | Permission | Rôle |
+|---|---|---|
+| `GET /partners?role=supplier&q=&active=&sort=&order=&limit=&offset=` | `partners:read` | Liste paginée `{items, total}` (recherche : code, nom, SIRET, e-mail, contact) |
+| `GET /partners/{id}` | `partners:read` | Fiche avec adresses et contacts |
+| `POST /partners`, `PATCH /partners/{id}` | `partners:manage` | Créer / modifier (`version` obligatoire au PATCH) |
+| `DELETE /partners/{id}` | `partners:manage` | Supprimer une fiche sans historique (sinon 409 : désactiver) |
+| `POST/PUT/DELETE /partners/{id}/addresses…`, `…/contacts…` | `partners:manage` | Adresses (siège, commande, enlèvement, retour…) et contacts |
+
+Contrôles : SIRET 14 chiffres et unique par société, IBAN (clé modulo 97), BIC,
+pas de boucle dans les groupements ; une seule adresse principale par type et un seul
+interlocuteur principal.
+
 ## Organisation du code
 
 ```

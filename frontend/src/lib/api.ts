@@ -65,8 +65,12 @@ async function toApiError(response: Response): Promise<ApiError> {
   // Format des erreurs métier de l'API : {"error": {"code", "message"}}
   const err = (body as { error?: { code: string; message: string } } | null)?.error
   if (err) return new ApiError(response.status, err.code, err.message)
-  // Erreur de validation FastAPI (422) : {"detail": [...]}
-  if (response.status === 422) return new ApiError(422, 'validation', 'Données invalides')
+  // Erreur de validation FastAPI (422) : {"detail": [{"msg": ...}, ...]} → le 1er message.
+  if (response.status === 422) {
+    const detail = (body as { detail?: { msg?: string }[] } | null)?.detail
+    const msg = Array.isArray(detail) ? detail[0]?.msg?.replace(/^Value error, /, '') : undefined
+    return new ApiError(422, 'validation', msg || 'Données invalides')
+  }
   return new ApiError(response.status, 'http_error', `Erreur ${response.status}`)
 }
 

@@ -8,6 +8,8 @@ import { ForcePasswordPage } from '@/pages/ForcePasswordPage'
 import { HomePage } from '@/pages/HomePage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { SupplierPage } from '@/pages/partners/SupplierPage'
+import { SuppliersPage } from '@/pages/partners/SuppliersPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 
 export const router = createBrowserRouter([
@@ -22,6 +24,8 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: 'profil', element: <ProfilePage /> },
+          { path: 'fournisseurs', element: <SuppliersPage /> },
+          { path: 'fournisseurs/:id', element: <SupplierPage /> },
           { path: 'admin/utilisateurs', element: <UsersAdminPage /> },
           { path: 'admin/societes', element: <CompaniesPage /> },
         ],

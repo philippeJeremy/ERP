@@ -9,7 +9,7 @@ from importlib import import_module
 
 from fastapi import APIRouter
 
-MODULES = ["auth", "org"]
+MODULES = ["auth", "org", "partners"]
 
 
 def load_models() -> None:

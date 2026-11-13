@@ -1,6 +1,7 @@
 import {
   Boxes,
   Building2,
+  Factory,
   LayoutDashboard,
   ReceiptText,
   ShieldCheck,
@@ -33,7 +34,8 @@ export const NAVIGATION: NavSection[] = [
   {
     title: 'Gestion',
     items: [
-      { label: 'Tiers', to: '/tiers', icon: Users, soon: true },
+      { label: 'Fournisseurs', to: '/fournisseurs', icon: Factory, permission: 'partners:read' },
+      { label: 'Clients', to: '/clients', icon: Users, soon: true },
       { label: 'Ventes', to: '/ventes', icon: ShoppingCart, soon: true },
       { label: 'Achats', to: '/achats', icon: Truck, soon: true },
       { label: 'Stock', to: '/stock', icon: Boxes, soon: true },
