@@ -280,11 +280,12 @@ export function PurchaseOrderPage() {
                   {r.delivery_note && <span className="text-muted-foreground">· BL {r.delivery_note}</span>}
                 </p>
                 <ul className="mt-1 text-muted-foreground">
-                  {r.lines.map((rl) => {
+                  {r.lines.map((rl, i) => {
                     const line = o.lines.find((l) => l.id === rl.order_line_id)
                     return (
-                      <li key={rl.order_line_id}>
+                      <li key={i}>
                         {qty(rl.quantity)} × {line?.designation}
+                        {rl.dot && <span className="ml-1 font-mono text-xs">· DOT {rl.dot}</span>}
                       </li>
                     )
                   })}

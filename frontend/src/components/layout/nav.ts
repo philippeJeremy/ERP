@@ -41,7 +41,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Clients', to: '/clients', icon: Users, soon: true },
       { label: 'Ventes', to: '/ventes', icon: ShoppingCart, soon: true },
       { label: 'Achats', to: '/achats', icon: Truck, permission: 'purchasing:read' },
-      { label: 'Stock', to: '/stock', icon: Boxes, soon: true },
+      { label: 'Stock', to: '/stock', icon: Boxes, permission: 'inventory:read' },
       { label: 'Facturation', to: '/facturation', icon: ReceiptText, soon: true },
     ],
   },

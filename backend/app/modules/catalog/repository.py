@@ -102,6 +102,32 @@ def _article_filters(
     return query
 
 
+def article_ids_matching(q: str | None, kind: str | None, size_digits: str | None) -> Select:
+    """Sous-requête des id d'articles correspondant à une recherche (pour les autres modules)."""
+    query = (
+        select(Article.id)
+        .select_from(Article)
+        .outerjoin(TireSpec)
+        .outerjoin(Brand, Brand.id == Article.brand_id)
+    )
+    return _article_filters(
+        query,
+        kind=kind,
+        q=q,
+        size_digits=size_digits,
+        season=None,
+        vehicle_type=None,
+        partner_id=None,
+        active=None,
+    )
+
+
+def articles_by_ids(db: Session, ids: list[int]) -> list[Article]:
+    if not ids:
+        return []
+    return list(db.scalars(select(Article).where(Article.id.in_(ids))).unique())
+
+
 def search_articles(
     db: Session,
     *,

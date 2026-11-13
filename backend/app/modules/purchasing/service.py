@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.context import RequestContext
 from app.core.errors import Conflict, DomainError, NotFound
 from app.modules.catalog import public as catalog
+from app.modules.inventory import public as inventory
 from app.modules.org import public as org
 from app.modules.partners import public as partners
 from app.modules.purchasing import repository as repo
@@ -421,6 +422,8 @@ def receive(db: Session, order_id: int, data: Receive) -> OrderRead:
         delivery_note=data.delivery_note,
         note=data.note,
     )
+    db.add(reception)
+    db.flush()  # l'id de la réception sert de référence aux mouvements de stock
     for item in received:
         line = lines.get(item.line_id)
         if line is None:
@@ -432,8 +435,29 @@ def receive(db: Session, order_id: int, data: Receive) -> OrderRead:
                 f"{remaining:g}. Une livraison en trop se traite avec le fournisseur (retour)."
             )
         line.received_qty += item.quantity
-        reception.lines.append(ReceptionLine(order_line_id=line.id, quantity=item.quantity))
-    db.add(reception)
+        location_id = None
+        if line.article_id is not None:
+            # Entrée en stock au coût d'achat NET (remise déduite) : c'est lui qui alimente
+            # le coût moyen pondéré. Une ligne libre (sans article) n'entre pas en stock.
+            location_id = inventory.receive_stock(
+                db,
+                article_id=line.article_id,
+                site_id=order.site_id,
+                location_id=item.location_id,
+                dot=item.dot,
+                quantity=item.quantity,
+                unit_cost=line.line_total / line.quantity,
+                source=f"reception:{reception.id}",
+                reference=reception.number,
+            )
+        reception.lines.append(
+            ReceptionLine(
+                order_line_id=line.id,
+                quantity=item.quantity,
+                location_id=location_id,
+                dot=item.dot,
+            )
+        )
     complete = all(x.received_qty >= x.quantity for x in order.lines)
     order.status = "recue" if complete else "partielle"
     order.updated_at = now()

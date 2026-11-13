@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.shared.schemas import ReadSchema, Schema
 
@@ -77,6 +77,8 @@ class SiteBrief(Schema):
 class ReceptionLineRead(ReadSchema):
     order_line_id: int
     quantity: Decimal
+    location_id: int | None
+    dot: str
 
 
 class ReceptionRead(ReadSchema):
@@ -153,8 +155,18 @@ class Acknowledge(Schema):
 
 
 class ReceiveLine(Schema):
+    """Une ligne de commande reçue. La même ligne peut revenir plusieurs fois pour
+    répartir la livraison sur plusieurs DOT ou plusieurs emplacements."""
+
     line_id: int
     quantity: Decimal = Field(ge=0, max_digits=14, decimal_places=3)
+    location_id: int | None = None  # vide = emplacement par défaut du dépôt (quai)
+    dot: str = Field("", pattern=r"^$|^(0[1-9]|[1-4][0-9]|5[0-3])[0-9]{2}$")
+
+    @field_validator("dot", mode="before")
+    @classmethod
+    def _clean_dot(cls, value: object) -> object:
+        return value.replace(" ", "") if isinstance(value, str) else value
 
 
 class Receive(Schema):

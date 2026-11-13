@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LoaderCircle, MapPin, Pencil, Plus, Star, Trash2, Warehouse } from 'lucide-react'
+import { LayoutGrid, LoaderCircle, MapPin, Pencil, Plus, Star, Trash2, Warehouse } from 'lucide-react'
 import { useState } from 'react'
 
 import { useAuth } from '@/auth/useAuth'
@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/native-select'
 import { api } from '@/lib/api'
 import { can } from '@/lib/permissions'
 import { gtinIsValid } from '@/pages/catalog/types'
+import { LocationsDialog } from '@/pages/inventory/LocationsDialog'
 import type { Site } from '@/pages/purchasing/types'
 
 
@@ -21,6 +22,8 @@ export function SitesPage() {
   const { me, company } = useAuth()
   const queryClient = useQueryClient()
   const [editing, setEditing] = useState<Site | 'new' | null>(null)
+  const [locationsOf, setLocationsOf] = useState<Site | null>(null)
+  const seeStock = can(me?.permissions, 'inventory:read')
   const canManage = can(me?.permissions, 'org:manage')
   const sites = useQuery({ queryKey: ['sites', company?.id], queryFn: () => api<Site[]>('/org/sites') })
   const remove = useMutation({
@@ -32,7 +35,7 @@ export function SitesPage() {
     <>
       <PageHeader
         title="Dépôts"
-        description={`Les lieux de ${company?.name} : adresses de livraison des commandes fournisseur, et futurs emplacements de stock.`}
+        description={`Les lieux de ${company?.name} : adresses de livraison des commandes fournisseur, et lieux de stock (avec leurs emplacements).`}
         actions={
           canManage && (
             <Button onClick={() => setEditing('new')}>
@@ -75,6 +78,11 @@ export function SitesPage() {
               </p>
               {s.gln && <p className="font-mono text-xs text-muted-foreground">GLN {s.gln}</p>}
               {s.delivery_notes && <p className="mt-1 text-xs whitespace-pre-line text-muted-foreground italic">{s.delivery_notes}</p>}
+              {seeStock && (
+                <Button variant="outline" size="sm" className="mt-2" onClick={() => setLocationsOf(s)}>
+                  <LayoutGrid /> Emplacements
+                </Button>
+              )}
             </div>
             {canManage && (
               <div className="flex flex-col gap-1">
@@ -96,6 +104,7 @@ export function SitesPage() {
         ))}
       </div>
       {editing && <SiteDialog site={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {locationsOf && <LocationsDialog site={locationsOf} onClose={() => setLocationsOf(null)} />}
     </>
   )
 }

@@ -33,6 +33,8 @@ DEFAULT_SEQUENCES = [
     ("credit_note", "Avoirs", "AV-{year}-", True),
     ("partner", "Codes tiers", "T", False),  # T00001, T00002… sans remise à zéro
     ("reception", "Réceptions fournisseur", "BR-{year}-", True),
+    ("transfer", "Transferts de stock", "TR-{year}-", True),
+    ("stock_count", "Inventaires", "INV-{year}-", True),
 ]
 
 
@@ -274,5 +276,5 @@ def delete_site(db: Session, site_id: int) -> None:
     except IntegrityError as exc:
         db.rollback()
         raise Conflict(
-            "Ce dépôt est utilisé par des commandes : désactivez-le plutôt.", code="depot_utilise"
+            "Ce dépôt est utilisé (commandes, stock) : désactivez-le plutôt.", code="depot_utilise"
         ) from exc

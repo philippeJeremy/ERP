@@ -14,6 +14,7 @@ import { can } from '@/lib/permissions'
 import { ArticleDialog } from '@/pages/catalog/ArticleDialog'
 import { SeasonBadge } from '@/pages/catalog/ArticlesPage'
 import { EuLabel } from '@/pages/catalog/EuLabel'
+import { ArticleStockSection } from '@/pages/inventory/ArticleStockSection'
 import { SupplierLinkDialog } from '@/pages/catalog/SupplierLinkDialog'
 import { formatPrice, KINDS, VEHICLE_TYPES, type Article, type ArticleSupplier } from '@/pages/catalog/types'
 
@@ -230,6 +231,8 @@ export function ArticlePage() {
           {links.data?.length === 0 && <p className="px-4 py-8 text-center text-sm text-muted-foreground">Aucun fournisseur dans cette société.</p>}
         </div>
       </section>
+
+      {can(me?.permissions, 'inventory:read') && <ArticleStockSection articleId={a.id} />}
 
       {editing && <ArticleDialog article={a} onClose={() => setEditing(false)} />}
       {linkEdit && (

@@ -174,3 +174,8 @@ class ReceptionLine(Base, IdMixin, CompanyScopedMixin):
         BigInteger, ForeignKey("purchasing.order_lines.id"), index=True
     )
     quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+    # Où l'article a été rangé, et son DOT (pneus) : repris dans le mouvement de stock.
+    location_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("inventory.locations.id")
+    )
+    dot: Mapped[str] = mapped_column(String(4), server_default="")

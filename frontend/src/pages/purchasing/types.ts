@@ -53,7 +53,7 @@ export interface Reception {
   delivery_note: string | null
   note: string | null
   created_at: string
-  lines: { order_line_id: number; quantity: string }[]
+  lines: { order_line_id: number; quantity: string; location_id: number | null; dot: string }[]
 }
 
 export interface Order {

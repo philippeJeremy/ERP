@@ -13,6 +13,8 @@ import { ArticlesPage } from '@/pages/catalog/ArticlesPage'
 import { ImportRunPage } from '@/pages/catalog/ImportRunPage'
 import { ImportsPage } from '@/pages/catalog/ImportsPage'
 import { NewImportPage } from '@/pages/catalog/NewImportPage'
+import { CountPage } from '@/pages/inventory/CountPage'
+import { StockPage } from '@/pages/inventory/StockPage'
 import { SitesPage } from '@/pages/admin/SitesPage'
 import { PurchaseOrderPage } from '@/pages/purchasing/PurchaseOrderPage'
 import { PurchaseOrdersPage } from '@/pages/purchasing/PurchaseOrdersPage'
@@ -38,6 +40,8 @@ export const router = createBrowserRouter([
           { path: 'achats', element: <PurchaseOrdersPage /> },
           { path: 'achats/:id', element: <PurchaseOrderPage /> },
           { path: 'admin/depots', element: <SitesPage /> },
+          { path: 'stock', element: <StockPage /> },
+          { path: 'stock/inventaires/:id', element: <CountPage /> },
           { path: 'articles/imports', element: <ImportsPage /> },
           { path: 'articles/imports/nouveau', element: <NewImportPage /> },
           { path: 'articles/imports/:id', element: <ImportRunPage /> },
