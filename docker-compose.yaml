@@ -24,6 +24,9 @@ x-backend: &backend
     JWT_SECRET: ${JWT_SECRET:?à définir dans .env}
     SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES:-30}
     SESSION_MAX_HOURS: ${SESSION_MAX_HOURS:-12}
+    # Chiffrement des mots de passe des relèves FTP/SFTP (facultatif tant qu'il n'y en a pas).
+    SECRETS_KEY: ${SECRETS_KEY:-}
+    IMPORT_ALLOW_PRIVATE_HOSTS: ${IMPORT_ALLOW_PRIVATE_HOSTS:-false}
     ROOT_PATH: /api
 
 services:

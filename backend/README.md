@@ -114,6 +114,25 @@ Fichier complet : les articles absents sont arrêtés ; au-delà de 30 % (et 10 
 Tâches de fond : `app/core/jobs.py` (`@job("nom")`, `enqueue("nom", …)`), exécutées par
 le worker ARQ ; `JOBS_INLINE=true` les exécute dans l'API (tests, dev sans worker).
 
+## Relèves automatiques des tarifs (FTP / FTPS / SFTP)
+
+Table `catalog.import_sources` (par société) : serveur, identifiant, secret **chiffré**
+(`app/core/secrets.py`, Fernet, clé `SECRETS_KEY`), dossier, motif (`tarif_*.csv`),
+fréquence, application automatique. `catalog.import_source_files` retient les fichiers
+déjà vus (nom + taille + date) : seul le plus récent des nouveaux est importé, et on ne
+modifie jamais les fichiers du fournisseur.
+
+- Le worker lance toutes les 5 minutes `catalog.poll_due_sources` : la fonction SQL
+  `catalog.due_import_sources()` (SECURITY DEFINER) liste les relèves dues de toutes
+  les sociétés, puis chacune est traitée avec le contexte de sa société (RLS).
+- `app/modules/catalog/remote.py` : délais de 20 s, adresses internes refusées sauf
+  `IMPORT_ALLOW_PRIVATE_HOSTS=true`, empreinte SSH vérifiée (confirmée au test de
+  connexion), certificat FTPS vérifié (désactivable par relève), taille maximale.
+- Application automatique seulement si l'analyse est propre (pas de confirmation
+  d'arrêts nécessaire, moins de 5 % de lignes en erreur) ; sinon l'import attend.
+
+Générer la clé : `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+
 ## Organisation du code
 
 ```

@@ -50,8 +50,19 @@ async def startup(ctx: dict) -> None:
     log.info("worker démarré")
 
 
+async def poll_import_sources(ctx: dict) -> int:
+    """Relèves automatiques des tarifs fournisseurs dont l'heure est venue."""
+    from app.core.jobs import JOBS
+
+    return await asyncio.to_thread(JOBS["catalog.poll_due_sources"])
+
+
 class WorkerSettings:
     functions = [ping, run_registered_job]
-    cron_jobs = [cron(purge_sessions, hour=3, minute=17)]  # heure UTC
+    cron_jobs = [
+        cron(purge_sessions, hour=3, minute=17),  # heure UTC
+        # Toutes les 5 minutes ; chaque relève a sa propre fréquence (next_check_at).
+        cron(poll_import_sources, minute=set(range(0, 60, 5)), unique=True, timeout=1800),
+    ]
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

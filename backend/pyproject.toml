@@ -18,10 +18,12 @@ dependencies = [
     "arq>=0.28",                  # tâches de fond sur Redis
     "openpyxl>=3.1",              # lecture des fichiers fournisseurs Excel (.xlsx)
     "xlrd>=2.0",                  # anciens fichiers Excel (.xls)
+    "paramiko>=5.0",              # relève des tarifs par SFTP
+    "cryptography>=45",           # chiffrement des accès FTP/SFTP des fournisseurs
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9.2", "httpx>=0.28", "ruff==0.17.4"]
+dev = ["pytest>=9.2", "httpx>=0.28", "ruff==0.17.4", "pyftpdlib>=2.0"]
 
 [build-system]
 requires = ["setuptools>=75"]

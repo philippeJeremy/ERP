@@ -10,7 +10,7 @@ from app.core.config import get_settings
 from app.core.context import RequestContext
 from app.core.db import get_db
 from app.modules.auth.public import require
-from app.modules.catalog import importer, service
+from app.modules.catalog import importer, service, sources
 from app.modules.catalog import repository as repo
 from app.modules.catalog.schemas import (
     ApplyImport,
@@ -23,12 +23,16 @@ from app.modules.catalog.schemas import (
     ArticleSupplierUpdate,
     ArticleUpdate,
     BrandRead,
+    ConnectionTestIn,
+    ConnectionTestResult,
     FilePreview,
     ImportLinePage,
     ImportProfileIn,
     ImportProfileRead,
     ImportRunPage,
     ImportRunRead,
+    ImportSourceIn,
+    ImportSourceRead,
 )
 from app.modules.partners import public as partners
 
@@ -266,3 +270,52 @@ def apply_import(
 @router.post("/imports/{run_id}/cancel", response_model=ImportRunRead, dependencies=[IMPORT])
 def cancel_import(run_id: int, db: Session = Depends(get_db)):
     return _run_read(db, importer.cancel_run(db, run_id))
+
+
+# --- Relèves automatiques ------------------------------------------------------------
+
+
+@router.get("/import-sources", response_model=list[ImportSourceRead], dependencies=[IMPORT])
+def list_sources(partner_id: int | None = None, db: Session = Depends(get_db)):
+    return sources.list_sources(db, partner_id)
+
+
+@router.get("/import-sources/settings", dependencies=[IMPORT])
+def sources_settings():
+    """Le serveur sait-il chiffrer les mots de passe ? (sinon : SECRETS_KEY à configurer)."""
+    return {"secrets_configured": sources.secrets_configured()}
+
+
+@router.post("/import-sources/test", response_model=ConnectionTestResult, dependencies=[IMPORT])
+def test_source(data: ConnectionTestIn, db: Session = Depends(get_db)):
+    """Connexion d'essai : liste les fichiers trouvés et, en SFTP, l'empreinte du serveur."""
+    return sources.test_connection(db, data)
+
+
+@router.post(
+    "/import-sources", response_model=ImportSourceRead, status_code=201, dependencies=[IMPORT]
+)
+def create_source(data: ImportSourceIn, db: Session = Depends(get_db)):
+    return sources.save_source(db, data)
+
+
+@router.put("/import-sources/{source_id}", response_model=ImportSourceRead, dependencies=[IMPORT])
+def update_source(source_id: int, data: ImportSourceIn, db: Session = Depends(get_db)):
+    return sources.save_source(db, data, source_id)
+
+
+@router.delete("/import-sources/{source_id}", status_code=204, dependencies=[IMPORT])
+def delete_source(source_id: int, db: Session = Depends(get_db)):
+    sources.delete_source(db, source_id)
+
+
+@router.post("/import-sources/{source_id}/run", response_model=ImportSourceRead)
+def run_source(source_id: int, db: Session = Depends(get_db), ctx: RequestContext = IMPORT):
+    """« Relever maintenant » : la relève part tout de suite dans le worker."""
+    return sources.run_now(db, ctx, source_id)
+
+
+@router.post("/import-sources/{source_id}/forget", status_code=204, dependencies=[IMPORT])
+def forget_files(source_id: int, db: Session = Depends(get_db)):
+    """Oublier les fichiers déjà traités (pour réimporter le dernier fichier)."""
+    sources.forget_seen_files(db, source_id)

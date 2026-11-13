@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, FileSpreadsheet, LoaderCircle, Plus } from 'lucide-react'
+import { ArrowLeft, FileSpreadsheet, History, LoaderCircle, Plus, RadioTower } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 
@@ -13,6 +13,9 @@ import { ErrorAlert } from '@/components/ui/field'
 import { api } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { can } from '@/lib/permissions'
+import { useUrlState } from '@/lib/useUrlState'
+import { cn } from '@/lib/utils'
+import { SourcesTab } from '@/pages/catalog/SourcesTab'
 import { RUN_STATUSES, type ImportRun, type Page } from '@/pages/catalog/types'
 
 const PAGE_SIZE = 20
@@ -21,6 +24,8 @@ export function ImportsPage() {
   const { me, company } = useAuth()
   const navigate = useNavigate()
   const [page, setPage] = useState(0)
+  const [params, update] = useUrlState()
+  const tab = params.get('onglet') === 'releves' ? 'releves' : 'historique'
   const allowed = can(me?.permissions, 'catalog:import')
   const runs = useQuery({
     queryKey: ['imports', company?.id, page],
@@ -47,7 +52,7 @@ export function ImportsPage() {
       <div className="mt-3">
         <PageHeader
           title="Imports tarifs"
-          description="Les fichiers des fournisseurs (reçus par mail aujourd'hui, par FTP/SFTP demain) : analysés, vérifiés, puis appliqués au catalogue."
+          description="Les fichiers tarifs des fournisseurs, déposés à la main ou relevés automatiquement par FTP/SFTP : analysés, vérifiés, puis appliqués au catalogue."
           actions={
             <Button asChild>
               <Link to="/articles/imports/nouveau">
@@ -57,6 +62,31 @@ export function ImportsPage() {
           }
         />
       </div>
+      <div role="tablist" className="mb-4 flex gap-1 border-b">
+        {[
+          { id: 'historique', label: 'Historique', icon: History },
+          { id: 'releves', label: 'Relèves automatiques', icon: RadioTower },
+        ].map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            type="button"
+            aria-selected={tab === t.id}
+            onClick={() => update({ onglet: t.id === 'historique' ? null : t.id })}
+            className={cn(
+              '-mb-px flex items-center gap-2 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+              tab === t.id ? 'border-accent text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
+          >
+            <t.icon className="size-4" />
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {tab === 'releves' ? (
+        <SourcesTab />
+      ) : (
+        <>
       <ErrorAlert error={runs.error} />
       <div className="overflow-x-auto rounded-xl border bg-card shadow-xs">
         <table className="w-full text-sm">
@@ -73,7 +103,10 @@ export function ImportsPage() {
             {runs.data?.items.map((r) => (
               <tr key={r.id} className="cursor-pointer hover:bg-secondary/40" onClick={() => navigate(`/articles/imports/${r.id}`)}>
                 <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(r.created_at)}</td>
-                <td className="px-4 py-3 font-medium">{r.partner_name}</td>
+                <td className="px-4 py-3">
+                  <p className="font-medium">{r.partner_name}</p>
+                  {r.source !== 'manuel' && <p className="text-xs text-muted-foreground">relève {r.source.toUpperCase()}</p>}
+                </td>
                 <td className="hidden px-4 py-3 md:table-cell">
                   <span className="flex items-center gap-2 text-muted-foreground">
                     <FileSpreadsheet className="size-4 shrink-0" /> <span className="truncate">{r.filename}</span>
@@ -116,6 +149,8 @@ export function ImportsPage() {
         )}
       </div>
       <Pagination page={page} pageSize={PAGE_SIZE} total={runs.data?.total ?? 0} noun={['import', 'imports']} onPage={setPage} />
+        </>
+      )}
     </>
   )
 }

@@ -204,3 +204,58 @@ export function gtinIsValid(code: string): boolean {
   return (10 - (total % 10)) % 10 === check
 }
 
+
+// --- Relèves automatiques ----------------------------------------------------------
+
+export type Protocol = 'sftp' | 'ftps' | 'ftp'
+
+export interface ImportSource {
+  id: number
+  partner_id: number
+  partner_name: string | null
+  profile_id: number | null
+  profile_name: string | null
+  name: string
+  protocol: Protocol
+  host: string
+  port: number
+  username: string
+  auth_method: 'password' | 'key'
+  has_secret: boolean
+  host_key: string | null
+  tls_verify: boolean
+  remote_dir: string
+  pattern: string
+  interval_hours: number
+  auto_apply: boolean
+  is_active: boolean
+  next_check_at: string | null
+  last_check_at: string | null
+  last_status: 'ok' | 'aucun_fichier' | 'erreur' | null
+  last_message: string | null
+  last_run_id: number | null
+  version: number
+}
+
+export interface ConnectionTest {
+  host_key: string | null
+  host_key_changed: boolean
+  files: { name: string; size: number; mtime: string | null; already_seen: boolean }[]
+}
+
+export const PROTOCOLS: Record<Protocol, { label: string; port: number; hint: string }> = {
+  sftp: { label: 'SFTP', port: 22, hint: 'Par SSH, chiffré. Le plus sûr : à privilégier.' },
+  ftps: { label: 'FTPS', port: 21, hint: 'FTP protégé par TLS, chiffré.' },
+  ftp: { label: 'FTP', port: 21, hint: 'Non chiffré : mot de passe et fichier circulent en clair. À éviter.' },
+}
+
+export const INTERVALS: Record<number, string> = {
+  1: 'Toutes les heures',
+  2: 'Toutes les 2 heures',
+  4: 'Toutes les 4 heures',
+  6: 'Toutes les 6 heures',
+  12: 'Deux fois par jour',
+  24: 'Une fois par jour',
+  48: 'Tous les 2 jours',
+  168: 'Une fois par semaine',
+}

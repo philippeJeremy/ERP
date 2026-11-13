@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     jobs_inline: bool = False
     # Taille maximale d'un fichier fournisseur importé.
     import_max_mb: int = 20
+    # Clé de chiffrement des secrets stockés en base (accès FTP/SFTP des fournisseurs).
+    # Générer : voir le README du backend (Fernet.generate_key()).
+    # La perdre = ressaisir les mots de passe des relèves. Ne JAMAIS la versionner.
+    secrets_key: SecretStr | None = None
+    # false : une relève FTP/SFTP ne peut viser ni le réseau local ni les services
+    # internes (protection contre le détournement du serveur pour sonder le réseau).
+    import_allow_private_hosts: bool = False
 
     jwt_secret: SecretStr
     jwt_algorithm: str = "HS256"

@@ -327,3 +327,86 @@ class ImportLinePage(Schema):
 
 class ApplyImport(Schema):
     confirm_discontinue: bool = False
+
+
+# --- Relèves automatiques (FTP / FTPS / SFTP) ---------------------------------------
+
+DEFAULT_PORTS = {"sftp": 22, "ftps": 21, "ftp": 21}
+
+
+class _SourceConnection(Schema):
+    protocol: Literal["sftp", "ftps", "ftp"]
+    # Nom ou adresse du serveur seulement (pas « sftp:// », pas de chemin).
+    host: str = Field(min_length=1, max_length=255, pattern=r"^[A-Za-z0-9.\-:\[\]]+$")
+    port: int | None = Field(None, ge=1, le=65535)
+    username: str = Field(min_length=1, max_length=100)
+    auth_method: Literal["password", "key"] = "password"
+    # Vide en modification = garder le secret enregistré.
+    secret: str | None = Field(None, max_length=10_000)
+    host_key: str | None = Field(None, max_length=200)
+    tls_verify: bool = True
+    remote_dir: str = Field("/", max_length=255)
+    pattern: str = Field("*", min_length=1, max_length=100, pattern=r"^[^/\\]+$")
+
+    @model_validator(mode="after")
+    def defaults(self):
+        if self.port is None:
+            self.port = DEFAULT_PORTS[self.protocol]
+        if self.protocol != "sftp":
+            self.auth_method = "password"
+            self.host_key = None
+        return self
+
+
+class ConnectionTestIn(_SourceConnection):
+    source_id: int | None = None  # pour réutiliser le mot de passe déjà enregistré
+
+
+class RemoteFileRead(Schema):
+    name: str
+    size: int
+    mtime: datetime | None
+    already_seen: bool = False
+
+
+class ConnectionTestResult(Schema):
+    host_key: str | None  # SFTP : empreinte à faire confirmer
+    host_key_changed: bool = False
+    files: list[RemoteFileRead]  # fichiers correspondant au motif, du plus récent au plus ancien
+
+
+class ImportSourceIn(_SourceConnection):
+    partner_id: int
+    profile_id: int
+    name: str = Field("Relève", min_length=1, max_length=100)
+    interval_hours: int = Field(24, ge=1, le=168)
+    auto_apply: bool = False
+    is_active: bool = True
+
+
+class ImportSourceRead(ReadSchema):
+    id: int
+    partner_id: int
+    partner_name: str | None = None
+    profile_id: int | None
+    profile_name: str | None = None
+    name: str
+    protocol: str
+    host: str
+    port: int
+    username: str
+    auth_method: str
+    has_secret: bool = False
+    host_key: str | None
+    tls_verify: bool
+    remote_dir: str
+    pattern: str
+    interval_hours: int
+    auto_apply: bool
+    is_active: bool
+    next_check_at: datetime | None
+    last_check_at: datetime | None
+    last_status: str | None
+    last_message: str | None
+    last_run_id: int | None
+    version: int

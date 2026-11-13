@@ -254,6 +254,79 @@ class ImportRun(Base, BusinessEntity, CompanyScopedMixin):
     applied_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("auth.users.id"))
 
 
+class ImportSource(Base, BusinessEntity, CompanyScopedMixin):
+    """Relève automatique : où et quand aller chercher le tarif d'un fournisseur."""
+
+    __tablename__ = "import_sources"
+    __table_args__ = (
+        UniqueConstraint("company_id", "partner_id", "name"),
+        CheckConstraint("protocol IN ('sftp', 'ftps', 'ftp')", name="protocol"),
+        CheckConstraint("auth_method IN ('password', 'key')", name="auth_method"),
+        CheckConstraint("port BETWEEN 1 AND 65535", name="port_range"),
+        CheckConstraint("interval_hours BETWEEN 1 AND 168", name="interval_range"),
+        CheckConstraint(
+            _in("last_status", ("ok", "aucun_fichier", "erreur"), nullable=True), name="last_status"
+        ),
+        Index("ix_import_sources_due", "next_check_at", postgresql_where=text("is_active")),
+        {"schema": "catalog"},
+    )
+
+    partner_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("partners.partners.id", ondelete="CASCADE"), index=True
+    )
+    # Le format de colonnes à appliquer (défini lors d'un premier import manuel).
+    profile_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("catalog.import_profiles.id", ondelete="SET NULL")
+    )
+    name: Mapped[str] = mapped_column(String(100))
+    protocol: Mapped[str] = mapped_column(String(10))
+    host: Mapped[str] = mapped_column(String(255))
+    port: Mapped[int]
+    username: Mapped[str] = mapped_column(String(100))
+    auth_method: Mapped[str] = mapped_column(String(10), server_default="password")
+    # Mot de passe ou clé privée SSH, chiffré (app/core/secrets.py). Jamais renvoyé.
+    secret: Mapped[str | None] = mapped_column(Text)
+    # SFTP : empreinte de la clé du serveur confirmée par l'utilisateur (« ssh-ed25519
+    # SHA256:… »). Une autre clé présentée ensuite = connexion refusée.
+    host_key: Mapped[str | None] = mapped_column(String(200))
+    tls_verify: Mapped[bool] = mapped_column(server_default="true")  # FTPS : certificat vérifié
+    remote_dir: Mapped[str] = mapped_column(String(255), server_default="/")
+    pattern: Mapped[str] = mapped_column(String(100), server_default="*")  # tarif_*.csv
+    interval_hours: Mapped[int] = mapped_column(server_default="24")
+    auto_apply: Mapped[bool] = mapped_column(server_default="false")
+    is_active: Mapped[bool] = mapped_column(server_default="true")
+    next_check_at: Mapped[datetime | None]
+    last_check_at: Mapped[datetime | None]
+    last_status: Mapped[str | None] = mapped_column(String(20))
+    last_message: Mapped[str | None] = mapped_column(Text)
+    last_run_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("catalog.import_runs.id", ondelete="SET NULL")
+    )
+
+
+class ImportSourceFile(Base, IdMixin, CompanyScopedMixin):
+    """Fichiers déjà vus sur le serveur du fournisseur : on ne traite pas deux fois le même."""
+
+    __tablename__ = "import_source_files"
+    __table_args__ = (
+        UniqueConstraint("source_id", "filename", "size", "mtime"),
+        CheckConstraint("status IN ('importe', 'ignore')", name="status"),
+        {"schema": "catalog"},
+    )
+
+    source_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("catalog.import_sources.id", ondelete="CASCADE"), index=True
+    )
+    filename: Mapped[str] = mapped_column(String(255))
+    size: Mapped[int] = mapped_column(BigInteger)
+    mtime: Mapped[datetime | None]
+    status: Mapped[str] = mapped_column(String(10))
+    run_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("catalog.import_runs.id", ondelete="SET NULL")
+    )
+    seen_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class ImportLine(Base, IdMixin, CompanyScopedMixin):
     """Résultat de l'analyse, ligne par ligne : c'est l'aperçu montré avant d'appliquer."""
 
