@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Banknote, FileCode2, FileDown, LoaderCircle, Plus, Send, Trash2, Undo2 } from 'lucide-react'
+import { ArrowLeft, Banknote, FileCode2, FileDown, LoaderCircle, Mail, Plus, Send, Trash2, Undo2 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -11,6 +11,7 @@ import { api, downloadFile, openFile } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { can } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
+import { EmailDialog } from '@/pages/mail/EmailDialog'
 import { ApplyCreditDialog, CreditNoteDialog, FreeLineDialog, PaymentDialog } from '@/pages/billing/dialogs'
 import { statusOf, type Invoice } from '@/pages/billing/types'
 import { fmtMoney, fmtQty } from '@/pages/inventory/types'
@@ -24,7 +25,7 @@ export function InvoicePage() {
   const queryClient = useQueryClient()
   const canManage = can(me?.permissions, 'billing:manage')
   const canPay = can(me?.permissions, 'billing:payments')
-  const [dialog, setDialog] = useState<'line' | 'credit' | 'pay' | 'apply' | null>(null)
+  const [dialog, setDialog] = useState<'line' | 'credit' | 'pay' | 'apply' | 'mail' | null>(null)
   const key = ['invoice', company?.id, Number(id)]
   const invoice = useQuery({ queryKey: key, queryFn: () => api<Invoice>(`/billing/invoices/${id}`) })
   const refresh = (i?: Invoice) => {
@@ -68,6 +69,7 @@ export function InvoicePage() {
               {inv.customer_name}
             </Link>
             {inv.issue_date && ` · émise le ${fmtDate(inv.issue_date)}`}
+            {inv.sent_at && ` · envoyée par mail le ${formatDateTime(inv.sent_at)}`}
             {inv.original && (
               <>
                 {' '}
@@ -86,6 +88,11 @@ export function InvoicePage() {
           {!draft && (
             <Button variant="outline" disabled={xml.isPending} onClick={() => xml.mutate()} title="Le XML CII embarqué dans le PDF">
               <FileCode2 /> XML
+            </Button>
+          )}
+          {canManage && !draft && (
+            <Button variant="outline" onClick={() => setDialog('mail')}>
+              <Mail /> {inv.sent_at ? 'Renvoyer par mail' : 'Envoyer par mail'}
             </Button>
           )}
           {canManage && draft && (
@@ -117,6 +124,9 @@ export function InvoicePage() {
         </div>
       </div>
       <ErrorAlert error={issue.error ?? remove.error ?? removeLine.error ?? pdf.error ?? xml.error ?? unallocate.error} />
+      {dialog === 'mail' && (
+        <EmailDialog<Invoice> title={`Envoyer ${inv.kind === 'facture' ? 'la facture' : "l'avoir"} ${inv.number}`} path={`/billing/invoices/${id}/email`} onSent={refresh} onClose={() => setDialog(null)} />
+      )}
       {draft && <p className="mb-4 rounded-md bg-secondary px-3 py-2 text-sm">Brouillon : vérifiez les lignes puis émettez. Le numéro définitif est donné à l'émission.</p>}
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <InfoCard title={inv.kind === 'facture' ? 'Facturé à' : 'Client'}>

@@ -7,6 +7,7 @@ import {
   EllipsisVertical,
   FileText,
   LoaderCircle,
+  Mail,
   PackageCheck,
   Send,
   ShieldCheck,
@@ -18,6 +19,7 @@ import { useState, type ReactNode } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
 import { useAuth } from '@/auth/useAuth'
+import { EmailDialog } from '@/pages/mail/EmailDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -49,6 +51,7 @@ export function PurchaseOrderPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [dialog, setDialog] = useState<DialogKind>(null)
+  const [mailing, setMailing] = useState(false)
   const canManage = can(me?.permissions, 'purchasing:manage')
   const canApprove = can(me?.permissions, 'purchasing:approve')
   const key = ['purchase-order', company?.id, Number(id)]
@@ -117,6 +120,11 @@ export function PurchaseOrderPage() {
               {pdf.isPending ? <LoaderCircle className="animate-spin" /> : <FileText />} Bon de commande PDF
             </Button>
           )}
+          {canManage && ['validee', 'envoyee', 'confirmee', 'partielle'].includes(o.status) && (
+            <Button variant="outline" onClick={() => setMailing(true)}>
+              <Mail /> Envoyer par mail
+            </Button>
+          )}
           {canManage && draft && (
             <Button disabled={busy || !o.lines.length} onClick={() => run('submit', { version: o.version })}>
               <Check /> {overThreshold && !canApprove ? 'Demander la validation' : 'Valider la commande'}
@@ -178,6 +186,7 @@ export function PurchaseOrderPage() {
 
       <div className="space-y-3">
         <ErrorAlert error={action.error ?? patch.error ?? remove.error ?? pdf.error} />
+        {mailing && <EmailDialog<Order> title={`Envoyer la commande ${o.number}`} path={`/purchasing/orders/${id}/email`} onSent={update} onClose={() => setMailing(false)} />}
         {draft && o.rejection_reason && (
           <Banner tone="destructive" icon={<X className="size-4" />}>
             Validation refusée : {o.rejection_reason}

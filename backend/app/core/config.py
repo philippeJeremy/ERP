@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     # false : une relève FTP/SFTP ne peut viser ni le réseau local ni les services
     # internes (protection contre le détournement du serveur pour sonder le réseau).
     import_allow_private_hosts: bool = False
+    # Même protection pour le serveur d'envoi de mails (SMTP) saisi dans l'ERP : true
+    # seulement si votre serveur de mail est sur le réseau local (ou pour les tests).
+    smtp_allow_private_hosts: bool = False
 
     jwt_secret: SecretStr
     jwt_algorithm: str = "HS256"

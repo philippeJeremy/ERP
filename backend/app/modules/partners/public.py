@@ -181,6 +181,32 @@ def customer_terms(db: Session, partner_id: int) -> CustomerTerms:
     )  # fmt: skip
 
 
+def email_suggestions(
+    db: Session, partner_id: int, purpose: str
+) -> tuple[list[str], list[tuple[str, str]]]:
+    """Destinataires d'un envoi : (adresses proposées par défaut, toutes les adresses connues
+    avec leur libellé). `purpose` = « facture » (adresse de facturation d'abord) ou autre."""
+    p = repo.get(db, partner_id)
+    if p is None:
+        raise NotFound("Tiers introuvable")
+    known: list[tuple[str, str]] = []
+    if p.invoice_email:
+        known.append(("Facturation", p.invoice_email))
+    if p.email:
+        known.append(("Adresse générale", p.email))
+    for c in p.contacts:
+        if c.email:
+            name = " ".join(x for x in (c.first_name, c.last_name) if x)
+            label = f"{name} ({c.job_title})" if c.job_title else name
+            known.append((label + (" — principal" if c.is_primary else ""), c.email))
+    primary = next((c.email for c in p.contacts if c.is_primary and c.email), None)
+    if purpose == "facture":
+        default = p.invoice_email or p.email or primary
+    else:
+        default = primary or p.email or p.invoice_email
+    return ([default] if default else []), known
+
+
 def search_partner_ids(db: Session, q: str) -> list[int]:
     """Ids des tiers dont le code ou le nom contient `q` (recherche des autres modules)."""
     pattern = f"%{q}%"
@@ -192,6 +218,7 @@ def search_partner_ids(db: Session, q: str) -> list[int]:
 
 
 __all__ = [
+    "email_suggestions",
     "CustomerTerms",
     "customer_terms",
     "get_customer",

@@ -5,10 +5,12 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.core.context import RequestContext
 from app.core.db import get_db
 from app.core.errors import NotFound
 from app.modules.auth.public import require
-from app.modules.sales import pdf, service
+from app.modules.mailing.public import EmailDraft, EmailSend
+from app.modules.sales import emails, pdf, service
 from app.modules.sales.schemas import (
     Accept,
     Confirm,
@@ -175,6 +177,20 @@ def cancel_quote(quote_id: int, db: Session = Depends(get_db)):
 def accept_quote(quote_id: int, data: Accept, db: Session = Depends(get_db)):
     """Accord du client : crée la commande confirmée et réserve le stock."""
     return service.accept_quote(db, quote_id, data)
+
+
+@router.get("/quotes/{quote_id}/email", response_model=EmailDraft)
+def quote_email_draft(quote_id: int, db: Session = Depends(get_db), ctx: RequestContext = MANAGE):
+    """Mail pré-rempli (modèle de la société) pour envoyer le devis."""
+    return emails.quote_draft(db, ctx, quote_id)
+
+
+@router.post("/quotes/{quote_id}/email", response_model=QuoteRead)
+def send_quote_email(
+    quote_id: int, data: EmailSend, db: Session = Depends(get_db), ctx: RequestContext = MANAGE
+):
+    """Envoie le devis en PDF ; un brouillon passe en « envoyé »."""
+    return emails.send_quote(db, ctx, quote_id, data)
 
 
 @router.get("/quotes/{quote_id}/pdf", dependencies=[READ])

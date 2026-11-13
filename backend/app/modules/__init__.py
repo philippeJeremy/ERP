@@ -10,7 +10,17 @@ from importlib.util import find_spec
 
 from fastapi import APIRouter
 
-MODULES = ["auth", "org", "partners", "catalog", "inventory", "purchasing", "sales", "billing"]
+MODULES = [
+    "auth",
+    "org",
+    "mailing",
+    "partners",
+    "catalog",
+    "inventory",
+    "purchasing",
+    "sales",
+    "billing",
+]
 
 
 def load_models() -> None:

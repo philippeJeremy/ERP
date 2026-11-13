@@ -179,6 +179,7 @@ class InvoiceRead(Schema):
     reminder_count: int
     last_reminder_at: datetime | None
     issued_at: datetime | None
+    sent_at: datetime | None
     lines: list[InvoiceLineRead]
     version: int
     created_at: datetime

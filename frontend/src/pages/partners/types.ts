@@ -37,6 +37,7 @@ export interface Partner {
   is_customer: boolean
   parent: { id: number; code: string; name: string } | null
   email: string | null
+  invoice_email: string | null
   phone: string | null
   website: string | null
   notes: string | null

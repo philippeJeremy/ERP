@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9.2", "httpx>=0.28", "ruff==0.17.4", "pyftpdlib>=2.0"]
+dev = ["pytest>=9.2", "httpx>=0.28", "ruff==0.17.4", "pyftpdlib>=2.0", "aiosmtpd>=1.4"]
 
 [build-system]
 requires = ["setuptools>=75"]

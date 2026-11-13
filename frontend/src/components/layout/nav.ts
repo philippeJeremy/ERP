@@ -3,6 +3,7 @@ import {
   Building2,
   Factory,
   LayoutDashboard,
+  Mail,
   Package,
   ReceiptText,
   ShieldCheck,
@@ -51,6 +52,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Utilisateurs et rôles', to: '/admin/utilisateurs', icon: ShieldCheck, permission: 'auth:read' },
       { label: 'Sociétés', to: '/admin/societes', icon: Building2, permission: 'org:read' },
       { label: 'Dépôts', to: '/admin/depots', icon: Warehouse, permission: 'org:read' },
+      { label: 'Messagerie', to: '/admin/messagerie', icon: Mail, permission: 'mail:read' },
     ],
   },
 ]

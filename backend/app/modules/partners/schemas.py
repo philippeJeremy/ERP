@@ -41,6 +41,7 @@ class _PartnerFields(Schema):
     gln: str | None = None
     parent_id: int | None = None
     email: EmailStr | None = None
+    invoice_email: EmailStr | None = None
     phone: str | None = Field(None, max_length=30)
     website: str | None = Field(None, max_length=200)
     notes: str | None = None
@@ -204,6 +205,7 @@ class PartnerRead(ReadSchema):
     is_customer: bool
     parent: PartnerRef | None
     email: str | None
+    invoice_email: str | None
     phone: str | None
     website: str | None
     notes: str | None

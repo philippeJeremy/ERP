@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { BellRing, CircleCheck, LoaderCircle } from 'lucide-react'
+import { BellRing, CircleCheck, LoaderCircle, Mail } from 'lucide-react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 
 import { useAuth } from '@/auth/useAuth'
@@ -11,29 +12,33 @@ import { can } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
 import type { AgingRow } from '@/pages/billing/types'
 import { fmtMoney } from '@/pages/inventory/types'
+import { EmailDialog } from '@/pages/mail/EmailDialog'
 
 /** Balance âgée : ce que doit chaque client, par ancienneté du retard ; relance en un clic. */
 export function ReceivablesTab() {
   const { me, company } = useAuth()
   const queryClient = useQueryClient()
   const canPay = can(me?.permissions, 'billing:payments')
+  const [mailTo, setMailTo] = useState<AgingRow | null>(null)
   const data = useQuery({ queryKey: ['receivables', company?.id], queryFn: () => api<{ rows: AgingRow[]; totals: AgingRow }>('/billing/receivables') })
+  const reminded = () => {
+    void queryClient.invalidateQueries({ queryKey: ['receivables'] })
+    void queryClient.invalidateQueries({ queryKey: ['invoices'] })
+  }
   const remind = useMutation({
     mutationFn: (customerId: number) => openFile(`/billing/customers/${customerId}/reminder`, 'POST'),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['receivables'] })
-      void queryClient.invalidateQueries({ queryKey: ['invoices'] })
-    },
+    onSuccess: reminded,
   })
   const t = data.data?.totals
   const cell = (v: string, danger = false) => <td className={cn('px-4 py-3 text-right tabular-nums', Number(v) ? (danger ? 'font-medium text-destructive' : '') : 'text-muted-foreground')}>{Number(v) ? fmtMoney(v) : '—'}</td>
   return (
     <>
       <p className="mb-4 text-sm text-muted-foreground">
-        Factures émises non soldées, par client et par ancienneté du retard. « Relancer » note la relance sur chaque facture en retard et ouvre la lettre (1re relance, 2e relance,
-        puis mise en demeure).
+        Factures émises non soldées, par client et par ancienneté du retard. « Lettre » ou « Mail » note la relance sur chaque facture en retard (1re relance, 2e relance, puis mise en demeure) : la lettre s'ouvre en PDF, le mail
+        part avec les factures jointes.
       </p>
       <ErrorAlert error={data.error ?? remind.error} />
+      {mailTo && <EmailDialog title={`Relancer ${mailTo.customer_name}`} path={`/billing/customers/${mailTo.customer_id}/reminder-email`} onSent={reminded} onClose={() => setMailTo(null)} />}
       {data.isPending && <LoaderCircle className="size-5 animate-spin text-muted-foreground" />}
       {data.data && data.data.rows.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-xl border bg-card py-12 text-center shadow-xs">
@@ -53,7 +58,7 @@ export function ReceivablesTab() {
                 <th className="px-4 py-2.5 text-right font-medium">+60 j</th>
                 <th className="px-4 py-2.5 text-right font-medium">Total dû</th>
                 <th className="hidden px-4 py-2.5 font-medium lg:table-cell">Dernière relance</th>
-                {canPay && <th className="w-28" />}
+                {canPay && <th className="w-48" />}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -75,9 +80,14 @@ export function ReceivablesTab() {
                     {canPay && (
                       <td className="px-2 py-1.5 text-right">
                         {late && (
-                          <Button size="sm" variant="outline" disabled={remind.isPending} onClick={() => remind.mutate(r.customer_id)}>
-                            <BellRing /> Relancer
-                          </Button>
+                          <div className="flex justify-end gap-1.5">
+                            <Button size="sm" variant="outline" disabled={remind.isPending} onClick={() => remind.mutate(r.customer_id)} title="Relance par courrier (PDF)">
+                              <BellRing /> Lettre
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setMailTo(r)} title="Relance par e-mail">
+                              <Mail /> Mail
+                            </Button>
+                          </div>
                         )}
                       </td>
                     )}

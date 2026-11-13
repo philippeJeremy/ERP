@@ -121,6 +121,7 @@ class Invoice(Base, BusinessEntity, CompanyScopedMixin, TotalsFields):
     issued_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("auth.users.id"))
     reminder_count: Mapped[int] = mapped_column(server_default="0")
     last_reminder_at: Mapped[datetime | None]
+    sent_at: Mapped[datetime | None]  # dernier envoi par mail
 
     lines: Mapped[list["InvoiceLine"]] = relationship(
         cascade="all, delete-orphan", lazy="selectin", order_by="InvoiceLine.line_no"

@@ -83,6 +83,7 @@ class Partner(Base, BusinessEntity, CompanyScopedMixin):
         BigInteger, ForeignKey("partners.partners.id", ondelete="SET NULL"), index=True
     )
     email: Mapped[str | None] = mapped_column(String(254))
+    invoice_email: Mapped[str | None] = mapped_column(String(254))  # envoi des factures
     phone: Mapped[str | None] = mapped_column(String(30))
     website: Mapped[str | None] = mapped_column(String(200))
     notes: Mapped[str | None] = mapped_column(Text)

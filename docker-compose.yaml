@@ -27,6 +27,7 @@ x-backend: &backend
     # Chiffrement des mots de passe des relèves FTP/SFTP (facultatif tant qu'il n'y en a pas).
     SECRETS_KEY: ${SECRETS_KEY:-}
     IMPORT_ALLOW_PRIVATE_HOSTS: ${IMPORT_ALLOW_PRIVATE_HOSTS:-false}
+    SMTP_ALLOW_PRIVATE_HOSTS: ${SMTP_ALLOW_PRIVATE_HOSTS:-false}
     ROOT_PATH: /api
 
 services:

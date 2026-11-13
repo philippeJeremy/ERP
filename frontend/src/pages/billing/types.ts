@@ -71,6 +71,7 @@ export interface Invoice {
   customer_siren: string | null
   customer_kind: string
   issue_date: string | null
+  sent_at: string | null
   due_date: string | null
   delivery_date: string | null
   payment_terms: string | null

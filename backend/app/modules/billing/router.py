@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.context import RequestContext
 from app.core.db import get_db
 from app.modules.auth.public import require
-from app.modules.billing import accounting, invoices, payments, pdf, suppliers
+from app.modules.billing import accounting, emails, invoices, payments, pdf, suppliers
 from app.modules.billing.common import Invalid, get_settings, save_settings
 from app.modules.billing.schemas import (
     Allocate,
@@ -40,6 +40,7 @@ from app.modules.billing.schemas import (
     SupplierLineIn,
     SupplierPaymentIn,
 )
+from app.modules.mailing.public import EmailDraft, EmailSend
 from app.shared.schemas import Schema
 
 router = APIRouter(prefix="/billing", tags=["Facturation"])
@@ -182,6 +183,36 @@ def invoice_pdf(invoice_id: int, db: Session = Depends(get_db)):
     invoice = invoices.get(db, invoice_id)
     name = invoice.number or f"brouillon-{invoice.id}"
     return _file(pdf.render_invoice(db, invoice), f"{name}.pdf", "application/pdf")
+
+
+@router.get("/invoices/{invoice_id}/email", response_model=EmailDraft)
+def invoice_email_draft(
+    invoice_id: int, db: Session = Depends(get_db), ctx: RequestContext = MANAGE
+):
+    return emails.invoice_draft(db, ctx, invoice_id)
+
+
+@router.post("/invoices/{invoice_id}/email", response_model=InvoiceRead)
+def send_invoice_email(
+    invoice_id: int, data: EmailSend, db: Session = Depends(get_db), ctx: RequestContext = MANAGE
+):
+    """Envoie la facture (PDF Factur-X) ou l'avoir au client."""
+    return emails.send_invoice(db, ctx, invoice_id, data)
+
+
+@router.get("/customers/{customer_id}/reminder-email", response_model=EmailDraft)
+def reminder_email_draft(
+    customer_id: int, db: Session = Depends(get_db), ctx: RequestContext = PAYMENTS
+):
+    return emails.reminder_draft(db, ctx, customer_id)
+
+
+@router.post("/customers/{customer_id}/reminder-email")
+def send_reminder_email(
+    customer_id: int, data: EmailSend, db: Session = Depends(get_db), ctx: RequestContext = PAYMENTS
+):
+    """Relance par mail (lettre PDF jointe) ; la relance est notée sur chaque facture."""
+    return emails.send_reminder(db, ctx, customer_id, data)
 
 
 @router.get("/invoices/{invoice_id}/xml", dependencies=[READ])

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, FileDown, LoaderCircle, RotateCcw, Send, X, XCircle } from 'lucide-react'
+import { ArrowLeft, Check, FileDown, LoaderCircle, Mail, RotateCcw, Send, X, XCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { ErrorAlert } from '@/components/ui/field'
 import { api, ApiError, openFile } from '@/lib/api'
 import { can } from '@/lib/permissions'
+import { EmailDialog } from '@/pages/mail/EmailDialog'
 import { CreditDialog, ReasonDialog } from '@/pages/sales/dialogs'
 import { LineDialog, type LineBody } from '@/pages/sales/LineDialog'
 import { DocTotals, InfoCard, SalesLinesTable } from '@/pages/sales/parts'
@@ -23,6 +24,7 @@ export function QuotePage() {
   const [editing, setEditing] = useState<SalesLine | 'new' | null>(null)
   const [refusing, setRefusing] = useState(false)
   const [credit, setCredit] = useState<string | null>(null)
+  const [mailing, setMailing] = useState(false)
   const key = ['quote', company?.id, Number(id)]
   const quote = useQuery({ queryKey: key, queryFn: () => api<Quote>(`/sales/quotes/${id}`) })
   const done = (q: Quote) => {
@@ -80,6 +82,11 @@ export function QuotePage() {
           <Button variant="outline" disabled={pdf.isPending} onClick={() => pdf.mutate()}>
             <FileDown /> PDF
           </Button>
+          {canManage && q.status !== 'annule' && q.lines.length > 0 && (
+            <Button variant="outline" onClick={() => setMailing(true)}>
+              <Mail /> Envoyer par mail
+            </Button>
+          )}
           {canManage && draft && (
             <Button variant="outline" disabled={!q.lines.length || action.isPending} onClick={() => action.mutate('send')}>
               <Send /> Marquer envoyé
@@ -112,6 +119,7 @@ export function QuotePage() {
         </div>
       </div>
       <ErrorAlert error={action.error ?? (accept.error instanceof ApiError && accept.error.code === 'encours_depasse' ? null : accept.error) ?? pdf.error ?? removeLine.error} />
+      {mailing && <EmailDialog<Quote> title={`Envoyer le devis ${q.number}`} path={`/sales/quotes/${id}/email`} onSent={done} onClose={() => setMailing(false)} />}
       {q.refusal_reason && <p className="mb-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">Refusé : {q.refusal_reason}</p>}
       <div className="mb-6 grid gap-4 md:grid-cols-3">
         <InfoCard title="Client">

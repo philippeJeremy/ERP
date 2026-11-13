@@ -227,6 +227,7 @@ def read(db: Session, invoice: Invoice) -> InvoiceRead:
         deliveries=[DocRef(id=i, number=numbers.get(i)) for i in sorted(delivery_ids)],
         allocations=allocations_of(db, invoice), reminder_count=invoice.reminder_count,
         last_reminder_at=invoice.last_reminder_at, issued_at=invoice.issued_at,
+        sent_at=invoice.sent_at,
         lines=lines, version=invoice.version, created_at=invoice.created_at,
     )  # fmt: skip
 

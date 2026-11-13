@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from app.core.context import RequestContext
 from app.core.db import get_db
 from app.modules.auth.public import require
-from app.modules.purchasing import pdf, service
+from app.modules.mailing.public import EmailDraft, EmailSend
+from app.modules.purchasing import emails, pdf, service
 from app.modules.purchasing.schemas import (
     Acknowledge,
     LineIn,
@@ -134,6 +135,19 @@ def close(order_id: int, data: Reason, db: Session = Depends(get_db)):
 @router.post("/orders/{order_id}/cancel", response_model=OrderRead, dependencies=[MANAGE])
 def cancel(order_id: int, data: Reason, db: Session = Depends(get_db)):
     return service.cancel(db, order_id, data.reason)
+
+
+@router.get("/orders/{order_id}/email", response_model=EmailDraft)
+def order_email_draft(order_id: int, db: Session = Depends(get_db), ctx: RequestContext = MANAGE):
+    return emails.order_draft(db, ctx, order_id)
+
+
+@router.post("/orders/{order_id}/email", response_model=OrderRead)
+def send_order_email(
+    order_id: int, data: EmailSend, db: Session = Depends(get_db), ctx: RequestContext = MANAGE
+):
+    """Envoie le bon de commande ; une commande validée passe en « envoyée »."""
+    return emails.send_order(db, ctx, order_id, data)
 
 
 @router.get("/orders/{order_id}/pdf", dependencies=[READ])

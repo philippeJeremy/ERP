@@ -24,6 +24,7 @@ import { SupplierInvoicePage } from '@/pages/billing/SupplierInvoicePage'
 import { CountPage } from '@/pages/inventory/CountPage'
 import { StockPage } from '@/pages/inventory/StockPage'
 import { SitesPage } from '@/pages/admin/SitesPage'
+import { MailSettingsPage } from '@/pages/mail/MailSettingsPage'
 import { PurchaseOrderPage } from '@/pages/purchasing/PurchaseOrderPage'
 import { PurchaseOrdersPage } from '@/pages/purchasing/PurchaseOrdersPage'
 import { SupplierPage } from '@/pages/partners/SupplierPage'
@@ -64,6 +65,7 @@ export const router = createBrowserRouter([
           { path: 'articles/:id', element: <ArticlePage /> },
           { path: 'admin/utilisateurs', element: <UsersAdminPage /> },
           { path: 'admin/societes', element: <CompaniesPage /> },
+          { path: 'admin/messagerie', element: <MailSettingsPage /> },
         ],
       },
     ],

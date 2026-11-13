@@ -121,6 +121,7 @@ const infoSchema = z.object({
   vat_number: text(20),
   gln: z.string().refine((v) => v.trim() === '' || (compact(v).length === 13 && gtinIsValid(compact(v))), 'GLN invalide (13 chiffres, clé GS1)'),
   email: z.union([z.literal(''), z.email('Adresse e-mail invalide')]),
+  invoice_email: z.union([z.literal(''), z.email('Adresse e-mail invalide')]),
   phone: text(30),
   website: text(200),
   notes: z.string(),
@@ -136,6 +137,7 @@ const infoDefaults = (p: Partner): InfoValues => ({
   vat_number: p.vat_number ?? '',
   gln: p.gln ?? '',
   email: p.email ?? '',
+  invoice_email: p.invoice_email ?? '',
   phone: p.phone ?? '',
   website: p.website ?? '',
   notes: p.notes ?? '',
@@ -168,6 +170,7 @@ export function InfoForm({ partner, readOnly, role = 'supplier' }: { partner: Pa
       )}
       <Section title="Coordonnées" description="Le standard. Les interlocuteurs sont dans l'onglet Contacts.">
         <TextField {...f} name="email" label="E-mail" type="email" />
+        <TextField {...f} name="invoice_email" label="E-mail de facturation" type="email" hint="Reçoit les factures et les relances" />
         <TextField {...f} name="phone" label="Téléphone" type="tel" />
         <TextField {...f} name="website" label="Site web" className="sm:col-span-2" />
       </Section>
