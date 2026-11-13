@@ -9,6 +9,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Polices embarquées dans les PDF (factures Factur-X / PDF/A : polices incluses obligatoires).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 # 1) Dépendances d'abord : cette couche reste en cache tant que pyproject.toml ne change pas.
 COPY pyproject.toml ./
 #    On installe seulement les dépendances listées dans pyproject.toml, pas le projet lui-même

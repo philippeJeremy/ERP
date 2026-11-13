@@ -1,6 +1,17 @@
 """Schéma PostgreSQL `org` : les sociétés (entités juridiques) et leur numérotation."""
 
-from sqlalchemy import BigInteger, CheckConstraint, Index, String, Text, UniqueConstraint, text
+from decimal import Decimal
+
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    Index,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.shared.models import Base, BusinessEntity, CompanyScopedMixin, IdMixin, TimestampMixin
@@ -32,6 +43,12 @@ class Company(Base, BusinessEntity):
     iban: Mapped[str | None] = mapped_column(String(34))
     bic: Mapped[str | None] = mapped_column(String(11))
     currency: Mapped[str] = mapped_column(String(3), server_default="EUR")
+    # Mentions légales obligatoires sur les factures (Code de commerce, art. L441-9).
+    share_capital: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))  # capital social
+    rcs: Mapped[str | None] = mapped_column(String(80))  # « RCS Lyon B 123 456 789 »
+    late_penalty: Mapped[str | None] = mapped_column(String(200))  # taux des pénalités de retard
+    early_payment_discount: Mapped[str | None] = mapped_column(String(200))  # escompte
+    invoice_footer: Mapped[str | None] = mapped_column(Text)  # mentions complémentaires
     is_active: Mapped[bool] = mapped_column(server_default="true")
 
 

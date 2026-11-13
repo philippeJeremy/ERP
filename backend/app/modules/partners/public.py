@@ -49,6 +49,9 @@ class SupplierTerms:
     vat_number: str | None
     gln: str | None
     order_address: list[str]  # lignes de l'adresse « commande » (sinon le siège)
+    payment_days: int | None = None
+    payment_end_of_month: bool = False
+    supplier_account: str | None = None
 
 
 PAYMENT_LABELS = {
@@ -112,7 +115,8 @@ def supplier_terms(db: Session, partner_id: int) -> SupplierTerms:
         payment_terms=_payment_terms(p), min_order_amount=p.min_order_amount,
         free_shipping_amount=p.free_shipping_amount, lead_time_days=p.lead_time_days,
         email=p.email, phone=p.phone, siret=p.siret, vat_number=p.vat_number, gln=p.gln,
-        order_address=lines,
+        order_address=lines, payment_days=p.payment_days,
+        payment_end_of_month=p.payment_end_of_month, supplier_account=p.supplier_account,
     )  # fmt: skip
 
 
@@ -144,6 +148,10 @@ class CustomerTerms:
     vehicle_registration: str | None
     billing_address: list[str]
     delivery_address: list[str]
+    payment_days: int | None = None
+    payment_end_of_month: bool = False
+    payment_method: str | None = None
+    customer_account: str | None = None
 
     def discount_for(self, kind: str | None) -> Decimal:
         family = self.family_discounts.get(kind or "")
@@ -168,6 +176,8 @@ def customer_terms(db: Session, partner_id: int) -> CustomerTerms:
         vehicle_registration=p.vehicle_registration,
         billing_address=_address_lines(p, ("facturation", "siege")),
         delivery_address=_address_lines(p, ("livraison", "siege", "facturation")),
+        payment_days=p.customer_payment_days, payment_end_of_month=p.customer_payment_end_of_month,
+        payment_method=p.customer_payment_method, customer_account=p.customer_account,
     )  # fmt: skip
 
 

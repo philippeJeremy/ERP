@@ -43,6 +43,11 @@ export interface Company {
   bic: string | null
   country_code: string
   currency: string
+  share_capital: string | null
+  rcs: string | null
+  late_penalty: string | null
+  early_payment_discount: string | null
+  invoice_footer: string | null
   is_active: boolean
   version: number
 }

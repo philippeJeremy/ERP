@@ -20,7 +20,8 @@ dependencies = [
     "xlrd>=2.0",                  # anciens fichiers Excel (.xls)
     "paramiko>=5.0",              # relève des tarifs par SFTP
     "cryptography>=45",           # chiffrement des accès FTP/SFTP des fournisseurs
-    "reportlab>=4.2",             # bons de commande PDF
+    "reportlab>=4.2",             # PDF : bons de commande, devis, factures
+    "factur-x>=3.1",              # facture électronique : XML CII embarqué dans le PDF
 ]
 
 [project.optional-dependencies]

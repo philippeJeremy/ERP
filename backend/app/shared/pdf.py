@@ -41,17 +41,45 @@ def multiline(text: str | None) -> str:
     return esc(text).replace("\n", "<br/>")
 
 
-def styles() -> dict[str, ParagraphStyle]:
+FONT_DIRS = ("/usr/share/fonts/truetype/dejavu",)
+
+
+def embedded_fonts() -> tuple[str, str]:
+    """Polices INCLUSES dans le PDF (DejaVu Sans) quand elles sont installées : exigé pour
+    un PDF/A (archivage, Factur-X). Sinon, les polices standard Helvetica."""
+    from pathlib import Path
+
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    if "DejaVuSans" in pdfmetrics.getRegisteredFontNames():
+        return "DejaVuSans", "DejaVuSans-Bold"
+    for folder in FONT_DIRS:
+        regular, bold = Path(folder, "DejaVuSans.ttf"), Path(folder, "DejaVuSans-Bold.ttf")
+        if regular.exists() and bold.exists():
+            pdfmetrics.registerFont(TTFont("DejaVuSans", str(regular)))
+            pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", str(bold)))
+            # <b> et <i> dans les paragraphes : on dit à reportlab quelle police utiliser.
+            pdfmetrics.registerFontFamily(
+                "DejaVuSans", normal="DejaVuSans", bold="DejaVuSans-Bold",
+                italic="DejaVuSans", boldItalic="DejaVuSans-Bold",
+            )  # fmt: skip
+            return "DejaVuSans", "DejaVuSans-Bold"
+    return "Helvetica", "Helvetica-Bold"
+
+
+def styles(font: str = "Helvetica", bold_font: str = "Helvetica-Bold") -> dict[str, ParagraphStyle]:
     sheet = getSampleStyleSheet()
-    base = ParagraphStyle("base", parent=sheet["Normal"], fontSize=9, leading=12, textColor=INK)
+    base = ParagraphStyle(
+        "base", parent=sheet["Normal"], fontName=font, fontSize=9, leading=12, textColor=INK
+    )
     return {
         "base": base,
         "small": ParagraphStyle("small", parent=base, fontSize=8, leading=10, textColor=MUTED),
-        "title": ParagraphStyle(
-            "title", parent=base, fontSize=18, leading=22, fontName="Helvetica-Bold"
-        ),
+        "tiny": ParagraphStyle("tiny", parent=base, fontSize=7, leading=9, textColor=MUTED),
+        "title": ParagraphStyle("title", parent=base, fontSize=18, leading=22, fontName=bold_font),
         "right": ParagraphStyle("right", parent=base, alignment=TA_RIGHT),
-        "bold": ParagraphStyle("bold", parent=base, fontName="Helvetica-Bold"),
+        "bold": ParagraphStyle("bold", parent=base, fontName=bold_font),
     }
 
 
@@ -71,12 +99,12 @@ def company_lines(company) -> list[str]:
     return lines
 
 
-def page_footer(label: str):
+def page_footer(label: str, font: str = "Helvetica"):
     """Pied de page « label — Page n » pour SimpleDocTemplate.build()."""
 
     def draw(canvas, document):
         canvas.saveState()
-        canvas.setFont("Helvetica", 7)
+        canvas.setFont(font, 7)
         canvas.setFillColor(MUTED)
         canvas.drawString(16 * mm, 9 * mm, label)
         canvas.drawRightString(A4[0] - 16 * mm, 9 * mm, f"Page {document.page}")

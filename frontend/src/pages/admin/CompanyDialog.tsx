@@ -35,6 +35,14 @@ const schema = z.object({
   iban: optional(34),
   bic: optional(11),
   currency: z.string().trim().regex(/^[A-Z]{3}$/, '3 lettres (EUR…)'),
+  share_capital: z
+    .string()
+    .trim()
+    .refine((v) => v === '' || /^\d{1,12}([.,]\d{1,2})?$/.test(v), 'Montant invalide'),
+  rcs: optional(80),
+  late_penalty: optional(200),
+  early_payment_discount: optional(200),
+  invoice_footer: optional(2000),
   is_active: z.boolean(),
 })
 type Values = z.infer<typeof schema>
@@ -76,6 +84,11 @@ export function CompanyDialog({
       iban: company?.iban ?? '',
       bic: company?.bic ?? '',
       currency: company?.currency ?? 'EUR',
+      share_capital: company?.share_capital ? String(Number(company.share_capital)) : '',
+      rcs: company?.rcs ?? '',
+      late_penalty: company?.late_penalty ?? '',
+      early_payment_discount: company?.early_payment_discount ?? '',
+      invoice_footer: company?.invoice_footer ?? '',
       is_active: company?.is_active ?? true,
     },
   })
@@ -88,6 +101,7 @@ export function CompanyDialog({
       const body: Record<string, unknown> = Object.fromEntries(
         Object.entries(rest).map(([k, value]) => [k, value === '' ? null : value]),
       )
+      if (typeof body.share_capital === 'string') body.share_capital = body.share_capital.replace(',', '.')
       if (!company) return api<Company>('/org/companies', { method: 'POST', body: { ...body, code } })
       // `version` : celle affichée à l'ouverture. Si quelqu'un a modifié la fiche
       // entre-temps, l'API refuse (409) au lieu d'écraser son travail.
@@ -110,7 +124,7 @@ export function CompanyDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{company ? `Modifier « ${company.name} »` : 'Nouvelle société'}</DialogTitle>
           <DialogDescription>
@@ -144,6 +158,19 @@ export function CompanyDialog({
             {text('iban', 'IBAN', { mono: true })}
             {text('bic', 'BIC', { mono: true })}
             {text('currency', 'Devise', { mono: true })}
+          </Group>
+          <Group title="Mentions légales des factures">
+            {text('share_capital', 'Capital social (€)')}
+            {text('rcs', 'Immatriculation RCS', { hint: 'RCS Lyon B 123 456 789' })}
+            {text('late_penalty', 'Taux des pénalités de retard', {
+              className: 'sm:col-span-2',
+              hint: "Vide : « taux BCE majoré de 10 points ». Ex. : 3 fois le taux d'intérêt légal",
+            })}
+            {text('early_payment_discount', 'Escompte pour paiement anticipé', {
+              className: 'sm:col-span-2',
+              hint: "Vide : « Pas d'escompte pour paiement anticipé »",
+            })}
+            {text('invoice_footer', 'Mentions complémentaires (pied de facture)', { className: 'sm:col-span-2' })}
           </Group>
           {company && isSuperuser && (
             <CheckRow

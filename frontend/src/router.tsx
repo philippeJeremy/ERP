@@ -18,6 +18,9 @@ import { CustomersPage } from '@/pages/customers/CustomersPage'
 import { OrderPage } from '@/pages/sales/OrderPage'
 import { QuotePage } from '@/pages/sales/QuotePage'
 import { SalesPage } from '@/pages/sales/SalesPage'
+import { BillingPage } from '@/pages/billing/BillingPage'
+import { InvoicePage } from '@/pages/billing/InvoicePage'
+import { SupplierInvoicePage } from '@/pages/billing/SupplierInvoicePage'
 import { CountPage } from '@/pages/inventory/CountPage'
 import { StockPage } from '@/pages/inventory/StockPage'
 import { SitesPage } from '@/pages/admin/SitesPage'
@@ -47,6 +50,9 @@ export const router = createBrowserRouter([
           { path: 'ventes', element: <SalesPage /> },
           { path: 'ventes/devis/:id', element: <QuotePage /> },
           { path: 'ventes/commandes/:id', element: <OrderPage /> },
+          { path: 'facturation', element: <BillingPage /> },
+          { path: 'facturation/factures/:id', element: <InvoicePage /> },
+          { path: 'facturation/fournisseurs/:id', element: <SupplierInvoicePage /> },
           { path: 'achats', element: <PurchaseOrdersPage /> },
           { path: 'achats/:id', element: <PurchaseOrderPage /> },
           { path: 'admin/depots', element: <SitesPage /> },

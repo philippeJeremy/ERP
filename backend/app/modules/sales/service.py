@@ -58,6 +58,15 @@ from app.modules.sales.schemas import (
 CENT = Decimal("0.01")
 ZERO = Decimal(0)
 
+# Autres composantes de l'encours, branchées par les modules suivants (la facturation :
+# factures impayées, livraisons non encore facturées). Fonction (db, client) → TTC.
+OUTSTANDING_SOURCES: list = []
+
+
+def outstanding(db: Session, customer_id: int, exclude_order_id: int | None = None) -> Decimal:
+    total = repo.outstanding(db, customer_id, exclude_order_id=exclude_order_id)
+    return total + sum((source(db, customer_id) for source in OUTSTANDING_SOURCES), ZERO)
+
 
 class Invalid(DomainError):
     status_code = 422
@@ -362,14 +371,14 @@ def _doc_fields(db: Session, doc: Quote | SalesOrder, margin: Decimal | None) ->
 
 def _credit(db: Session, customer_id: int) -> Credit:
     terms = partners.customer_terms(db, customer_id)
-    return Credit(limit=terms.credit_limit, outstanding=repo.outstanding(db, customer_id))
+    return Credit(limit=terms.credit_limit, outstanding=outstanding(db, customer_id))
 
 
 def _check_credit(db: Session, order: SalesOrder, force: bool) -> None:
     terms = partners.customer_terms(db, order.customer_id)
     if terms.credit_limit is None or force:
         return
-    total = repo.outstanding(db, order.customer_id, exclude_order_id=order.id) + order.total_ttc
+    total = outstanding(db, order.customer_id, exclude_order_id=order.id) + order.total_ttc
     if total > terms.credit_limit:
         raise CreditExceeded(
             f"Encours dépassé pour {terms.name} : {money(total)} € TTC avec cette commande, "

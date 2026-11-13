@@ -183,11 +183,11 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 
 /** Ouvre un fichier protégé (PDF…) dans un nouvel onglet : un simple lien n'enverrait
  *  pas le jeton d'accès, on télécharge donc le fichier puis on l'affiche. */
-export async function openFile(path: string): Promise<void> {
+export async function openFile(path: string, method: 'GET' | 'POST' = 'GET'): Promise<void> {
   // Onglet ouvert tout de suite (au clic) : sinon le navigateur le bloquerait.
   const tab = window.open('', '_blank')
   try {
-    const blob = await api<Blob>(path, { blob: true })
+    const blob = await api<Blob>(path, { blob: true, method })
     const url = URL.createObjectURL(blob)
     if (tab) tab.location.href = url
     else window.location.href = url
@@ -196,4 +196,17 @@ export async function openFile(path: string): Promise<void> {
     tab?.close()
     throw error
   }
+}
+
+/** Télécharge un fichier protégé (export CSV, FEC, XML) sous le nom donné. */
+export async function downloadFile(path: string, filename: string): Promise<void> {
+  const blob = await api<Blob>(path, { blob: true })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }

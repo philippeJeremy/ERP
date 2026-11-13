@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from pydantic import EmailStr, Field, field_validator
 
 from app.shared.schemas import ReadSchema, Schema
@@ -19,6 +21,11 @@ class CompanyBase(Schema):
     iban: str | None = Field(None, max_length=34)
     bic: str | None = Field(None, max_length=11)
     currency: str = Field("EUR", pattern=r"^[A-Z]{3}$")
+    share_capital: Decimal | None = Field(None, ge=0, max_digits=14, decimal_places=2)
+    rcs: str | None = Field(None, max_length=80)
+    late_penalty: str | None = Field(None, max_length=200)
+    early_payment_discount: str | None = Field(None, max_length=200)
+    invoice_footer: str | None = Field(None, max_length=2000)
 
 
 class CompanyCreate(CompanyBase):
@@ -46,6 +53,11 @@ class CompanyUpdate(Schema):
     iban: str | None = Field(None, max_length=34)
     bic: str | None = Field(None, max_length=11)
     currency: str | None = Field(None, pattern=r"^[A-Z]{3}$")
+    share_capital: Decimal | None = Field(None, ge=0, max_digits=14, decimal_places=2)
+    rcs: str | None = Field(None, max_length=80)
+    late_penalty: str | None = Field(None, max_length=200)
+    early_payment_discount: str | None = Field(None, max_length=200)
+    invoice_footer: str | None = Field(None, max_length=2000)
     is_active: bool | None = None
 
 
@@ -66,6 +78,11 @@ class CompanyRead(ReadSchema):
     iban: str | None
     bic: str | None
     currency: str
+    share_capital: Decimal | None
+    rcs: str | None
+    late_penalty: str | None
+    early_payment_discount: str | None
+    invoice_footer: str | None
     is_active: bool
     version: int
 

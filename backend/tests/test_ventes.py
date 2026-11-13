@@ -330,7 +330,8 @@ def test_cycle_vente(client, monde):  # noqa: F811
     assert client.delete(f"/sales/orders/{draft['id']}", headers=su).status_code == 204
 
     activity = ok(client.get(f"/sales/customers/{garage['id']}/activity", headers=su))
-    assert D(activity["credit"]["outstanding"]) == 0 and len(activity["orders"]) == 2
+    # Plus de commande en cours ; reste le livré non facturé : (3 × 96,80 + 4,20 + 50 + 5,70) × 1,2.
+    assert D(activity["credit"]["outstanding"]) == D("420.36") and len(activity["orders"]) == 2
     page = ok(client.get(f"/sales/quotes?q=Martin {s}", headers=su))
     assert [x["id"] for x in page["items"]] == [qid]
     assert ok(client.get("/sales/orders?open=true", headers=su))["total"] == 0

@@ -42,7 +42,7 @@ export const NAVIGATION: NavSection[] = [
       { label: 'Ventes', to: '/ventes', icon: ShoppingCart, permission: 'sales:read' },
       { label: 'Achats', to: '/achats', icon: Truck, permission: 'purchasing:read' },
       { label: 'Stock', to: '/stock', icon: Boxes, permission: 'inventory:read' },
-      { label: 'Facturation', to: '/facturation', icon: ReceiptText, soon: true },
+      { label: 'Facturation', to: '/facturation', icon: ReceiptText, permission: 'billing:read' },
     ],
   },
   {

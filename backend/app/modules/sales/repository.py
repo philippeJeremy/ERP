@@ -125,15 +125,23 @@ def list_orders(
 
 
 def outstanding(db: Session, customer_id: int, exclude_order_id: int | None = None) -> Decimal:
-    """Encours : total TTC des commandes confirmées pas encore soldées.
-    (Quand la facturation existera, les factures non payées s'y ajouteront.)"""
-    query = select(func.coalesce(func.sum(SalesOrder.total_ttc), 0)).where(
+    """Encours des commandes : le RESTE À LIVRER (TTC) des commandes confirmées.
+    Ce qui est livré est compté par la facturation (non facturé, puis facture impayée)."""
+    query = select(SalesOrder).where(
         SalesOrder.customer_id == customer_id,
         SalesOrder.status.in_(("confirmee", "partielle")),
     )
     if exclude_order_id is not None:
         query = query.where(SalesOrder.id != exclude_order_id)
-    return Decimal(db.scalar(query))
+    total = Decimal(0)
+    for order in db.scalars(query):
+        for line in order.lines:
+            remaining = line.quantity - line.delivered_qty
+            if remaining <= 0:
+                continue
+            ht = (line.line_total + line.quantity * line.eco_fee) * remaining / line.quantity
+            total += ht * (1 + line.vat_rate / 100)
+    return total.quantize(Decimal("0.01"))
 
 
 def deliveries_of(db: Session, order_id: int) -> list[Delivery]:
