@@ -107,3 +107,5 @@ class UserCompanyAccess(Schema):
     roles: list[RoleBrief]
     can_manage: bool
     grantable_role_ids: list[int]
+    extra_permissions: list[str]
+    grantable_permissions: list[str]

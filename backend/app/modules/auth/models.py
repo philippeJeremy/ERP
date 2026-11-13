@@ -124,3 +124,28 @@ class RefreshToken(Base):
     revoked_at: Mapped[datetime | None]
     revoked_reason: Mapped[str | None] = mapped_column(String(20))
     user_agent: Mapped[str | None] = mapped_column(String(255))
+
+
+class UserCompanyPermission(Base):
+    """Droit individuel : complète les rôles d'un utilisateur DANS une société.
+
+    Droits effectifs = droits de ses rôles + ses droits individuels. Évite de créer un
+    rôle pour chaque cas particulier (« Commercial, mais qui peut aussi voir les
+    utilisateurs »). L'accès à la société reste donné par un rôle (au minimum le rôle
+    système « Membre », qui n'a aucun droit).
+    """
+
+    __tablename__ = "user_company_permissions"
+    __table_args__ = {"schema": "auth"}
+
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("auth.users.id", ondelete="CASCADE"), primary_key=True
+    )
+    company_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("org.companies.id"), primary_key=True, index=True
+    )
+    permission: Mapped[str] = mapped_column(String(100), primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    created_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("auth.users.id"), server_default=CURRENT_USER_ID
+    )

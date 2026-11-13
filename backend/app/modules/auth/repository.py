@@ -4,7 +4,14 @@ from datetime import datetime
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session
 
-from app.modules.auth.models import RefreshToken, Role, RolePermission, User, UserCompanyRole
+from app.modules.auth.models import (
+    RefreshToken,
+    Role,
+    RolePermission,
+    User,
+    UserCompanyPermission,
+    UserCompanyRole,
+)
 
 
 def get_user(db: Session, user_id: int) -> User | None:
@@ -50,8 +57,39 @@ def permissions_in_company(db: Session, user_id: int, company_id: int) -> set[st
     )
     rows = db.execute(query).all()
     if not rows:
-        return None
-    return {permission for _, permission in rows if permission is not None}
+        return None  # aucun rôle = aucun accès, même avec des droits individuels
+    from_roles = {permission for _, permission in rows if permission is not None}
+    return from_roles | set(direct_permissions(db, user_id, company_id))
+
+
+def direct_permissions(db: Session, user_id: int, company_id: int) -> list[str]:
+    """Droits individuels de l'utilisateur dans la société (hors rôles)."""
+    query = (
+        select(UserCompanyPermission.permission)
+        .where(
+            UserCompanyPermission.user_id == user_id,
+            UserCompanyPermission.company_id == company_id,
+        )
+        .order_by(UserCompanyPermission.permission)
+    )
+    return list(db.scalars(query))
+
+
+def set_direct_permissions(
+    db: Session, user_id: int, company_id: int, permissions: set[str]
+) -> None:
+    current = set(direct_permissions(db, user_id, company_id))
+    if current - permissions:
+        db.execute(
+            delete(UserCompanyPermission).where(
+                UserCompanyPermission.user_id == user_id,
+                UserCompanyPermission.company_id == company_id,
+                UserCompanyPermission.permission.in_(current - permissions),
+            )
+        )
+    for permission in sorted(permissions - current):
+        db.add(UserCompanyPermission(user_id=user_id, company_id=company_id, permission=permission))
+    db.flush()
 
 
 def users_in_company(db: Session, company_id: int) -> list[tuple[User, Role]]:
@@ -174,5 +212,6 @@ def role_user_counts(db: Session) -> dict[int, int]:
 
 def revoke_company_access(db: Session, company_id: int) -> int:
     """Retire tous les rôles attribués dans une société (avant sa suppression)."""
+    db.execute(delete(UserCompanyPermission).where(UserCompanyPermission.company_id == company_id))
     result = db.execute(delete(UserCompanyRole).where(UserCompanyRole.company_id == company_id))
     return result.rowcount

@@ -15,10 +15,10 @@ import { CheckRow, ErrorAlert, Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { generatePassword } from '@/lib/password'
-import type { Role, UserCompanyAccess, UserInCompany } from '@/lib/types'
+import type { PermissionInfo, Role, UserCompanyAccess, UserInCompany } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { RolePicker } from '@/pages/admin/RolePicker'
-import { useCanGrant } from '@/pages/admin/roles'
+import { groupByModule, moduleLabel, roleCovers, useCanGrant } from '@/pages/admin/roles'
 
 interface Props {
   user: UserInCompany
@@ -176,6 +176,11 @@ function CompanyAccessSection({ user, roles, isSelf }: { user: UserInCompany; ro
     queryKey: ['user-access', user.id],
     queryFn: () => api<UserCompanyAccess[]>(`/org/user-access/${user.id}`, { withCompany: false }),
   })
+  const catalog = useQuery({
+    queryKey: ['permissions'],
+    queryFn: () => api<PermissionInfo[]>('/auth/permissions', { withCompany: false }),
+    staleTime: Infinity,
+  })
   // Société courante en premier, puis celles où la personne a accès, puis les autres.
   const rows = [...(access.data ?? [])].sort(
     (x, y) =>
@@ -189,7 +194,7 @@ function CompanyAccessSection({ user, roles, isSelf }: { user: UserInCompany; ro
       <p className="text-sm text-muted-foreground">
         {isSelf
           ? 'Vous ne pouvez pas modifier vos propres accès.'
-          : 'Les rôles de la personne dans chaque société. Sans rôle, elle n\'a pas accès à la société.'}
+          : "Ses rôles dans chaque société, complétés si besoin par des droits individuels. Sans rôle, elle n'a pas accès à la société."}
       </p>
       <ErrorAlert error={access.error} />
       {access.isPending && <LoaderCircle className="size-5 animate-spin text-muted-foreground" />}
@@ -200,6 +205,7 @@ function CompanyAccessSection({ user, roles, isSelf }: { user: UserInCompany; ro
             user={user}
             row={row}
             roles={roles}
+            catalog={catalog.data ?? []}
             isCurrent={row.company.id === current?.id}
             editing={editing === row.company.id}
             onEdit={(on) => setEditing(on ? row.company.id : null)}
@@ -214,6 +220,7 @@ function CompanyAccessRow({
   user,
   row,
   roles,
+  catalog,
   isCurrent,
   editing,
   onEdit,
@@ -221,6 +228,7 @@ function CompanyAccessRow({
   user: UserInCompany
   row: UserCompanyAccess
   roles: Role[]
+  catalog: PermissionInfo[]
   isCurrent: boolean
   editing: boolean
   onEdit: (on: boolean) => void
@@ -228,16 +236,23 @@ function CompanyAccessRow({
   const queryClient = useQueryClient()
   const initial = row.roles.map((r) => r.id)
   const [roleIds, setRoleIds] = useState<number[]>(initial)
+  const [extras, setExtras] = useState<string[]>(row.extra_permissions)
   const hasAccess = row.roles.length > 0
-  const dirty = roleIds.length !== initial.length || roleIds.some((id) => !initial.includes(id))
+  const sameSet = <T,>(x: T[], y: T[]) => x.length === y.length && x.every((v) => y.includes(v))
+  const rolesDirty = !sameSet(roleIds, initial)
+  const extrasDirty = !sameSet(extras, row.extra_permissions)
   const removing = hasAccess && roleIds.length === 0
+  const dirty = rolesDirty || (roleIds.length > 0 && extrasDirty)
+  const labels = new Map(catalog.map((p) => [p.code, p.label]))
 
   const save = useMutation({
-    mutationFn: () =>
-      api<UserInCompany>(`/auth/users/${user.id}/companies/${row.company.id}/roles`, {
-        method: 'PUT',
-        body: { role_ids: roleIds },
-      }),
+    mutationFn: async () => {
+      const base = `/auth/users/${user.id}/companies/${row.company.id}`
+      // Les rôles d'abord : ils donnent l'accès sans lequel les droits individuels sont refusés.
+      if (rolesDirty) await api<UserInCompany>(`${base}/roles`, { method: 'PUT', body: { role_ids: roleIds } })
+      if (roleIds.length > 0 && extrasDirty)
+        await api<string[]>(`${base}/permissions`, { method: 'PUT', body: { permissions: extras } })
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['user-access', user.id] })
       void queryClient.invalidateQueries({ queryKey: ['users'] })
@@ -265,11 +280,18 @@ function CompanyAccessRow({
           </p>
           <div className="mt-1 flex flex-wrap gap-1">
             {hasAccess ? (
-              row.roles.map((r) => (
-                <Badge key={r.id} variant="secondary">
-                  {r.name}
-                </Badge>
-              ))
+              <>
+                {row.roles.map((r) => (
+                  <Badge key={r.id} variant="secondary">
+                    {r.name}
+                  </Badge>
+                ))}
+                {row.extra_permissions.map((p) => (
+                  <Badge key={p} variant="outline" title={`Droit individuel : ${p}`}>
+                    + {labels.get(p) ?? p}
+                  </Badge>
+                ))}
+              </>
             ) : (
               <span className="text-xs text-muted-foreground">Pas d'accès</span>
             )}
@@ -282,6 +304,7 @@ function CompanyAccessRow({
             variant={hasAccess ? 'outline' : 'secondary'}
             onClick={() => {
               setRoleIds(initial)
+              setExtras(row.extra_permissions)
               save.reset()
               onEdit(true)
             }}
@@ -294,6 +317,15 @@ function CompanyAccessRow({
       {editing && (
         <div className="space-y-3 rounded-lg bg-secondary/40 p-3">
           <RolePicker roles={roles} value={roleIds} onChange={setRoleIds} grantableIds={row.grantable_role_ids} />
+          {roleIds.length > 0 && (
+            <ExtraPermissions
+              catalog={catalog}
+              selectedRoles={roles.filter((r) => roleIds.includes(r.id))}
+              value={extras}
+              onChange={setExtras}
+              grantable={row.grantable_permissions}
+            />
+          )}
           <ErrorAlert error={save.error} />
           {removing && (
             <p className="text-xs text-muted-foreground">
@@ -318,6 +350,60 @@ function CompanyAccessRow({
         </div>
       )}
     </li>
+  )
+}
+
+/** Droits individuels : ceux que les rôles cochés donnent déjà sont affichés, grisés. */
+function ExtraPermissions({
+  catalog,
+  selectedRoles,
+  value,
+  onChange,
+  grantable,
+}: {
+  catalog: PermissionInfo[]
+  selectedRoles: Role[]
+  value: string[]
+  onChange: (permissions: string[]) => void
+  grantable: string[]
+}) {
+  return (
+    <details className="group rounded-lg border bg-card" open={value.length > 0}>
+      <summary className="cursor-pointer list-none px-3 py-2 text-sm font-medium select-none">
+        <span className="inline-block transition-transform group-open:rotate-90">›</span> Droits supplémentaires
+        {value.length > 0 && <span className="ml-1 text-muted-foreground">({value.length})</span>}
+        <span className="block text-xs font-normal text-muted-foreground">
+          En plus de ses rôles, pour cette personne seulement.
+        </span>
+      </summary>
+      <div className="space-y-3 border-t p-3">
+        {groupByModule(catalog).map(([module, perms]) => (
+          <div key={module} className="space-y-1.5">
+            <h5 className="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">{moduleLabel(module)}</h5>
+            {perms.map((p) => {
+              const via = selectedRoles.find((r) => roleCovers(r, p.code))
+              const allowed = grantable.includes(p.code)
+              return (
+                <CheckRow
+                  key={p.code}
+                  checked={!!via || value.includes(p.code)}
+                  disabled={!!via || !allowed}
+                  onChange={(on) => onChange(on ? [...value, p.code] : value.filter((c) => c !== p.code))}
+                  title={p.label}
+                  description={
+                    via
+                      ? `Déjà donné par le rôle « ${via.name} »`
+                      : allowed
+                        ? <span className="font-mono">{p.code}</span>
+                        : "Vous n'avez pas ce droit : vous ne pouvez pas l'accorder"
+                  }
+                />
+              )
+            })}
+          </div>
+        ))}
+      </div>
+    </details>
   )
 }
 

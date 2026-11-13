@@ -33,6 +33,7 @@ from app.modules.auth.schemas import (
     UserAttach,
     UserCreate,
     UserInCompany,
+    UserPermissionsUpdate,
     UserRead,
     UserRolesUpdate,
     UserUpdate,
@@ -250,6 +251,19 @@ def set_roles_in_company(
     Le droit auth:manage est vérifié DANS la société visée (pas la société courante).
     """
     return service.set_roles_in_company(db, ctx, user_id, company_id, data.role_ids)
+
+
+@router.put("/users/{user_id}/companies/{company_id}/permissions", response_model=list[str])
+def set_permissions_in_company(
+    user_id: int,
+    company_id: int,
+    data: UserPermissionsUpdate,
+    db: Session = Depends(get_db),
+    ctx: RequestContext = Depends(get_context),
+):
+    """Remplace les droits individuels de l'utilisateur dans une société (en plus de ses
+    rôles). Il faut lui avoir donné au moins un rôle dans cette société."""
+    return service.set_permissions_in_company(db, ctx, user_id, company_id, data.permissions)
 
 
 @router.post("/users/{user_id}/roles", status_code=status.HTTP_204_NO_CONTENT)

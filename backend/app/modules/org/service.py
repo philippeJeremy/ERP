@@ -63,6 +63,8 @@ def user_access(db: Session, ctx: RequestContext, user_id: int) -> list[UserComp
             roles=[RoleBrief(**r.model_dump()) for r in infos[c.id].roles],
             can_manage=infos[c.id].can_manage,
             grantable_role_ids=infos[c.id].grantable_role_ids,
+            extra_permissions=infos[c.id].extra_permissions,
+            grantable_permissions=infos[c.id].grantable_permissions,
         )
         for c in companies
         if c.id in infos

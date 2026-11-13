@@ -10,18 +10,7 @@ import { CheckRow, ErrorAlert, Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import type { PermissionInfo, Role } from '@/lib/types'
-
-const MODULE_LABELS: Record<string, string> = {
-  auth: 'Utilisateurs et rôles',
-  org: 'Société',
-  partners: 'Tiers',
-  catalog: 'Articles',
-  sales: 'Ventes',
-  purchasing: 'Achats',
-  inventory: 'Stock',
-  invoicing: 'Facturation',
-}
-const moduleLabel = (m: string) => MODULE_LABELS[m] ?? m
+import { moduleLabel } from '@/pages/admin/roles'
 
 export function RolesTab() {
   const { me } = useAuth()

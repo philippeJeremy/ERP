@@ -84,4 +84,8 @@ export interface UserCompanyAccess {
   can_manage: boolean
   /** Rôles qu'il peut attribuer dans cette société (règle anti-escalade). */
   grantable_role_ids: number[]
+  /** Droits individuels de l'utilisateur dans cette société (en plus de ses rôles). */
+  extra_permissions: string[]
+  /** Droits individuels que l'administrateur connecté peut accorder. */
+  grantable_permissions: string[]
 }

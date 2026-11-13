@@ -304,7 +304,9 @@ def _ensure_can_manage_account(db: Session, ctx: RequestContext, user: User) -> 
             "Ce compte a accès à d'autres sociétés : seul un super-administrateur peut "
             "le modifier. Vous pouvez gérer ses rôles dans cette société."
         )
-    if not all(_can_grant(ctx, r) for r in repo.roles_in_company(db, user.id, ctx.company_id)):
+    target = repo.permissions_in_company(db, user.id, ctx.company_id) or set()
+    if not all(ctx.has(p) for p in target):
+        # Rôles ET droits individuels : on ne prend pas la main sur plus puissant que soi.
         raise Forbidden("Ce compte a plus de droits que vous : vous ne pouvez pas le modifier")
 
 
@@ -419,12 +421,64 @@ def _apply_roles(
             if not _can_grant(ctx, current[role_id]):
                 raise Forbidden(f"Vous ne pouvez pas retirer le rôle « {current[role_id].name} »")
             repo.remove_role(db, user.id, ctx.company_id, role_id)
+        if not wanted:
+            # Plus aucun rôle = plus d'accès : ses droits individuels dans la société
+            # partent avec (sinon ils réapparaîtraient au prochain rôle attribué).
+            _check_direct_change(
+                ctx, set(repo.direct_permissions(db, user.id, ctx.company_id)), set()
+            )
+            repo.set_direct_permissions(db, user.id, ctx.company_id, set())
         db.flush()
     except IntegrityError as exc:  # société inexistante (clé étrangère)
         db.rollback()
         raise NotFound("Société introuvable") from exc
     db.commit()
     return _user_view(db, ctx, user)
+
+
+# --- Droits individuels --------------------------------------------------------------
+
+
+def _check_direct_change(ctx: RequestContext, before: set[str], after: set[str]) -> None:
+    """Anti-escalade : on n'accorde ni ne retire un droit qu'on n'a pas soi-même."""
+    forbidden = sorted(p for p in before ^ after if not ctx.has(p))
+    if forbidden:
+        raise Forbidden(
+            f"Vous ne pouvez pas accorder ou retirer des droits que vous n'avez pas : "
+            f"{', '.join(forbidden)}"
+        )
+
+
+def set_permissions_in_company(
+    db: Session, caller: RequestContext, user_id: int, company_id: int, permissions: list[str]
+) -> list[str]:
+    """Remplace les droits individuels d'un utilisateur dans une société."""
+    user = _visible_user(db, caller, user_id)
+    if user.id == caller.user_id:
+        raise DomainError("Vous ne pouvez pas modifier vos propres droits")
+    cctx = _company_ctx(db, caller, company_id)
+    if not caller.is_superuser:
+        if not cctx.has("auth:manage"):
+            raise Forbidden("Vous n'avez pas le droit de gérer les accès à cette société")
+        run_company_guards(db, company_id)
+    if company_id not in repo.company_ids_of(db, user.id):
+        raise DomainError(
+            "Donnez d'abord un rôle à la personne dans cette société (au minimum « Membre »)",
+            code="acces_requis",
+        )
+    catalog = all_permissions()
+    unknown = sorted(set(permissions) - set(catalog))
+    if unknown:
+        # Seulement des droits précis (pas de « * » ni « module:* ») : un droit individuel
+        # doit rester lisible. Pour « tout un module », on passe par un rôle.
+        raise DomainError(f"Droits inconnus : {', '.join(unknown)}", code="permission_inconnue")
+    before = set(repo.direct_permissions(db, user.id, company_id))
+    after = set(permissions)
+    _check_direct_change(cctx, before, after)
+    set_db_context(db, user_id=caller.user_id, company_id=company_id)  # pour l'audit
+    repo.set_direct_permissions(db, user.id, company_id, after)
+    db.commit()
+    return sorted(after)
 
 
 # --- Accès d'un utilisateur à TOUTES les sociétés -----------------------------------
@@ -464,6 +518,7 @@ def user_company_access(
     """
     user = _visible_user(db, caller, user_id)
     all_roles = repo.list_roles(db)
+    catalog = sorted(all_permissions())
     result = []
     for company_id in company_ids:
         cctx = _company_ctx(db, caller, company_id)
@@ -481,6 +536,8 @@ def user_company_access(
                 grantable_role_ids=(
                     [r.id for r in all_roles if _can_grant(cctx, r)] if can_manage else []
                 ),
+                extra_permissions=repo.direct_permissions(db, user.id, company_id),
+                grantable_permissions=([p for p in catalog if cctx.has(p)] if can_manage else []),
             )
         )
     return result

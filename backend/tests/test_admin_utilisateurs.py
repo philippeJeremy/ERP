@@ -562,3 +562,101 @@ def test_acces_aux_societes(client, monde):
         db.commit()
         stranger_id = stranger.id
     assert client.get(f"/org/user-access/{stranger_id}", headers=admin).status_code == 404
+
+
+def test_droits_individuels(client, monde):
+    """Rôle + droits individuels : pas besoin d'un rôle par cas particulier."""
+    su, a, b = monde["su"], monde["a"], monde["b"]
+    lecteur = monde["lecteur"]  # rôle « lecteur » = org:read
+    url = f"/auth/users/{lecteur['id']}/companies/{a}/permissions"
+    lh = login(client, lecteur["email"], a)
+    assert client.get("/auth/users", headers=lh).status_code == 403
+
+    # Lui ajouter « voir les utilisateurs », sans toucher à son rôle.
+    r = client.put(url, headers=su, json={"permissions": ["auth:read"]})
+    assert (r.status_code, r.json()) == (200, ["auth:read"])
+    assert client.get("/auth/users", headers=lh).status_code == 200
+    me = client.get("/auth/me", headers=lh).json()
+    assert sorted(me["permissions"]) == ["auth:read", "org:read"]
+    access = next(
+        x
+        for x in client.get(f"/org/user-access/{lecteur['id']}", headers=su).json()
+        if x["company"]["id"] == a
+    )
+    assert access["extra_permissions"] == ["auth:read"]
+    assert "auth:manage" in access["grantable_permissions"]
+
+    # Seulement des droits précis du catalogue (pas de joker).
+    for bad in (["*"], ["auth:*"], ["inventee:x"]):
+        assert client.put(url, headers=su, json={"permissions": bad}).status_code == 400
+
+    # Anti-escalade : un gestionnaire (auth:read + auth:manage) ne peut pas accorder
+    # org:manage, qu'il n'a pas ; il peut accorder auth:manage, qu'il a.
+    gh = login(client, monde["gestionnaire"]["email"], a)
+    assert (
+        client.put(url, headers=gh, json={"permissions": ["auth:read", "org:manage"]}).status_code
+        == 403
+    )
+    assert (
+        client.put(url, headers=gh, json={"permissions": ["auth:read", "auth:manage"]}).status_code
+        == 200
+    )
+    # … et ne peut plus modifier le compte : il a maintenant autant de droits que lui
+    # PLUS org:read, que le gestionnaire n'a pas.
+    assert (
+        client.patch(
+            f"/auth/users/{lecteur['id']}", headers=gh, json={"full_name": "X"}
+        ).status_code
+        == 403
+    )
+    # Pas sur soi-même.
+    assert (
+        client.put(
+            f"/auth/users/{monde['gestionnaire']['id']}/companies/{a}/permissions",
+            headers=gh,
+            json={"permissions": []},
+        ).status_code
+        == 400
+    )
+
+    # Sans accès à la société : il faut d'abord un rôle (au minimum « Membre »).
+    r = client.put(
+        f"/auth/users/{lecteur['id']}/companies/{b}/permissions",
+        headers=su,
+        json={"permissions": ["auth:read"]},
+    )
+    assert (r.status_code, r.json()["error"]["code"]) == (400, "acces_requis")
+    membre = next(
+        x["id"] for x in client.get("/auth/roles", headers=su).json() if x["code"] == "membre"
+    )
+    client.put(
+        f"/auth/users/{lecteur['id']}/companies/{b}/roles", headers=su, json={"role_ids": [membre]}
+    )
+    lb = login(client, lecteur["email"], b)
+    assert client.get("/auth/me", headers=lb).json()["permissions"] == []
+    client.put(
+        f"/auth/users/{lecteur['id']}/companies/{b}/permissions",
+        headers=su,
+        json={"permissions": ["auth:read"]},
+    )
+    assert client.get("/auth/users", headers=lb).status_code == 200
+
+    # Retirer l'accès (plus de rôle) supprime aussi ses droits individuels.
+    client.put(
+        f"/auth/users/{lecteur['id']}/companies/{b}/roles", headers=su, json={"role_ids": []}
+    )
+    client.put(
+        f"/auth/users/{lecteur['id']}/companies/{b}/roles", headers=su, json={"role_ids": [membre]}
+    )
+    assert (
+        client.get("/auth/me", headers=login(client, lecteur["email"], b)).json()["permissions"]
+        == []
+    )
+    # Tracé dans le journal d'audit.
+    with owner_conn() as conn:
+        assert (
+            conn.execute(
+                "SELECT count(*) FROM audit.audit_log WHERE table_name = 'user_company_permissions'"
+            ).fetchone()[0]
+            > 0
+        )

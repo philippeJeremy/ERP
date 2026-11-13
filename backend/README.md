@@ -57,6 +57,7 @@ Documentation interactive (dev) : http://127.0.0.1:8000/docs. Utiliser le bouton
 | `PUT /auth/users/{id}/roles` | `auth:manage` | Remplacer ses rôles dans la société (vide = retirer l'accès) |
 | `GET /org/user-access/{id}` | connecté | Ses rôles dans chacune de VOS sociétés (+ ce que vous pouvez y attribuer) |
 | `PUT /auth/users/{id}/companies/{company_id}/roles` | `auth:manage` dans cette société | Donner / modifier / retirer l'accès à une société |
+| `PUT /auth/users/{id}/companies/{company_id}/permissions` | `auth:manage` dans cette société | Droits individuels, en plus des rôles |
 | `POST/PATCH/DELETE /auth/roles…` | super-admin | Rôles, communs à tout le groupe |
 
 Règles anti-escalade (dans `auth/service.py`, testées dans `tests/test_admin_utilisateurs.py`) :
@@ -64,7 +65,13 @@ Règles anti-escalade (dans `auth/service.py`, testées dans `tests/test_admin_u
 - on ne modifie pas ses propres rôles, on ne désactive pas son propre compte ;
 - on ne modifie l'identité ou le mot de passe d'un compte que s'il n'a pas plus de droits
   que soi et n'a accès qu'à la société courante (sinon : super-administrateur) ;
-- un rôle système, ou encore attribué, ne se supprime pas.
+- un rôle système, ou encore attribué, ne se supprime pas ;
+- droits individuels : on n'accorde ou ne retire que des droits qu'on a soi-même ; il
+  faut un rôle dans la société (au minimum le rôle système « Membre », sans droit) ;
+  retirer tous les rôles supprime aussi les droits individuels.
+
+Droits effectifs dans une société = droits des rôles + droits individuels
+(`auth.user_company_permissions`).
 
 ## Organisation du code
 

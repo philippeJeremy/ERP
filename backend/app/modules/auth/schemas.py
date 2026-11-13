@@ -91,6 +91,16 @@ class CompanyAccessInfo(Schema):
     can_manage: bool
     # Rôles qu'il a le droit d'attribuer DANS cette société (règle anti-escalade).
     grantable_role_ids: list[int]
+    # Droits individuels de l'utilisateur dans cette société (en plus de ses rôles).
+    extra_permissions: list[str] = []
+    # Droits individuels que l'administrateur connecté peut accorder (ceux qu'il a).
+    grantable_permissions: list[str] = []
+
+
+class UserPermissionsUpdate(Schema):
+    """Liste complète des droits individuels dans une société (remplace l'existante)."""
+
+    permissions: list[str]
 
 
 class PasswordReset(Schema):
