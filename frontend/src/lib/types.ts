@@ -76,3 +76,12 @@ export interface PermissionInfo {
   code: string
   label: string
 }
+
+export interface UserCompanyAccess {
+  company: { id: number; code: string; name: string; is_active: boolean }
+  roles: RoleRef[]
+  /** L'administrateur connecté peut modifier ces rôles. */
+  can_manage: boolean
+  /** Rôles qu'il peut attribuer dans cette société (règle anti-escalade). */
+  grantable_role_ids: number[]
+}

@@ -461,3 +461,104 @@ def test_mot_de_passe_provisoire_a_changer(client, monde):
     )
     again = login(client, email, monde["a"], password="provisoire-numero-2x")
     assert client.get("/auth/users", headers=again).status_code == 403
+
+
+def test_acces_aux_societes(client, monde):
+    """Donner / modifier / retirer l'accès d'un utilisateur à n'importe quelle société."""
+    su, a, b = monde["su"], monde["a"], monde["b"]
+    lecteur = monde["lecteur"]
+
+    # Le super-admin voit les deux sociétés ; le lecteur n'a accès qu'à A.
+    access = {
+        x["company"]["id"]: x
+        for x in client.get(f"/org/user-access/{lecteur['id']}", headers=su).json()
+    }
+    assert {a, b} <= set(access)
+    assert [r["id"] for r in access[a]["roles"]] == [monde["lecteur_role"]]
+    assert access[b]["roles"] == [] and access[b]["can_manage"] is True
+
+    # Lui donner accès à B, sans changer de société courante (en-tête X-Company-Id = A).
+    r = client.put(
+        f"/auth/users/{lecteur['id']}/companies/{b}/roles",
+        headers=su,
+        json={"role_ids": [monde["gestionnaire_role"]]},
+    )
+    assert r.status_code == 200, r.text
+    assert (
+        login(client, lecteur["email"], b)
+        and client.get("/auth/users", headers=login(client, lecteur["email"], b)).status_code == 200
+    )
+
+    # Un admin de A seulement : ne voit que A, et ne peut rien faire dans B.
+    admin = login(client, monde["admin"]["email"], a)
+    seen = [
+        x["company"]["id"]
+        for x in client.get(f"/org/user-access/{lecteur['id']}", headers=admin).json()
+    ]
+    assert seen == [a]
+    r = client.put(
+        f"/auth/users/{lecteur['id']}/companies/{b}/roles", headers=admin, json={"role_ids": []}
+    )
+    assert r.status_code == 403
+
+    # Admin dans A et simple gestionnaire dans B : la règle anti-escalade vaut PAR société.
+    client.put(
+        f"/auth/users/{monde['admin']['id']}/companies/{b}/roles",
+        headers=su,
+        json={"role_ids": [monde["gestionnaire_role"]]},
+    )
+    access = {
+        x["company"]["id"]: x
+        for x in client.get(f"/org/user-access/{lecteur['id']}", headers=admin).json()
+    }
+    assert monde["admin_role"] in access[a]["grantable_role_ids"]
+    assert monde["admin_role"] not in access[b]["grantable_role_ids"]
+    r = client.put(
+        f"/auth/users/{lecteur['id']}/companies/{b}/roles",
+        headers=admin,
+        json={"role_ids": [monde["gestionnaire_role"], monde["admin_role"]]},
+    )
+    assert r.status_code == 403
+    # Retirer l'accès à B (liste vide).
+    r = client.put(
+        f"/auth/users/{lecteur['id']}/companies/{b}/roles", headers=admin, json={"role_ids": []}
+    )
+    assert r.status_code == 200
+    assert (
+        client.post(
+            "/auth/login", data={"username": lecteur["email"], "password": PASSWORD}
+        ).status_code
+        == 200
+    )
+    assert client.get("/auth/users", headers=login(client, lecteur["email"], b)).status_code == 403
+
+    # Ses propres accès : non modifiables. Société inconnue : 404.
+    own = client.get(f"/org/user-access/{monde['admin']['id']}", headers=admin).json()
+    assert all(x["can_manage"] is False for x in own)
+    assert (
+        client.put(
+            f"/auth/users/{monde['admin']['id']}/companies/{b}/roles",
+            headers=admin,
+            json={"role_ids": []},
+        ).status_code
+        == 400
+    )
+    assert (
+        client.put(
+            f"/auth/users/{lecteur['id']}/companies/999999/roles",
+            headers=su,
+            json={"role_ids": [monde["lecteur_role"]]},
+        ).status_code
+        == 404
+    )
+    # Un utilisateur qu'il ne « voit » pas (aucune société commune) : 404.
+    with SessionLocal() as db:
+        stranger = User(
+            email=f"inconnu-{uid()}@test.fr",
+            full_name="Inconnu",
+            password_hash=hash_password(PASSWORD),
+        )
+        db.add(stranger)
+        db.commit()
+        stranger_id = stranger.id
+    assert client.get(f"/org/user-access/{stranger_id}", headers=admin).status_code == 404

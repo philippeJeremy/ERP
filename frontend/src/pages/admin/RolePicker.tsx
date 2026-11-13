@@ -7,13 +7,18 @@ export function RolePicker({
   value,
   onChange,
   disabled,
+  grantableIds,
 }: {
   roles: Role[]
   value: number[]
   onChange: (ids: number[]) => void
   disabled?: boolean
+  /** Rôles attribuables, calculés par l'API pour une société donnée. Sans cette
+   * liste : règle appliquée avec les droits dans la société courante. */
+  grantableIds?: number[]
 }) {
-  const canGrant = useCanGrant()
+  const canGrantHere = useCanGrant()
+  const canGrant = (role: Role) => (grantableIds ? grantableIds.includes(role.id) : canGrantHere(role))
   return (
     <div className="grid gap-2">
       {roles.map((role) => {

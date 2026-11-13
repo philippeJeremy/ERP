@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Copy, KeyRound, LoaderCircle, Lock } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CheckCircle2, KeyRound, LoaderCircle, Lock } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { Link } from 'react-router'
@@ -9,12 +9,14 @@ import { z } from 'zod'
 import { useAuth } from '@/auth/useAuth'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { CopyButton } from '@/components/ui/copy-button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CheckRow, ErrorAlert, Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { generatePassword } from '@/lib/password'
-import type { Role, UserInCompany } from '@/lib/types'
+import type { Role, UserCompanyAccess, UserInCompany } from '@/lib/types'
+import { cn } from '@/lib/utils'
 import { RolePicker } from '@/pages/admin/RolePicker'
 import { useCanGrant } from '@/pages/admin/roles'
 
@@ -44,7 +46,7 @@ function Saved({ show, children = 'Enregistré' }: { show: boolean; children?: R
 }
 
 export function EditUserDialog({ user, roles, canManage, onClose }: Props) {
-  const { me, company } = useAuth()
+  const { me } = useAuth()
   const canGrant = useCanGrant()
   const isSelf = user.id === me?.user.id
   const isSuperuser = !!me?.user.is_superuser
@@ -81,7 +83,7 @@ export function EditUserDialog({ user, roles, canManage, onClose }: Props) {
 
         <div className="space-y-5">
           <IdentitySection user={user} locked={!!lockReason} isSelf={isSelf} />
-          <RolesSection user={user} roles={roles} locked={!canManage || isSelf} isSelf={isSelf} companyName={company?.name} onRemoved={onClose} />
+          <CompanyAccessSection user={user} roles={roles} isSelf={isSelf} />
           {canManage && (
             <Section title="Mot de passe">
               {isSelf ? (
@@ -165,64 +167,157 @@ function IdentitySection({ user, locked, isSelf }: { user: UserInCompany; locked
   )
 }
 
-// --- Rôles ------------------------------------------------------------------------------
+// --- Accès aux sociétés ----------------------------------------------------------------
 
-function RolesSection({
+function CompanyAccessSection({ user, roles, isSelf }: { user: UserInCompany; roles: Role[]; isSelf: boolean }) {
+  const { company: current } = useAuth()
+  const [editing, setEditing] = useState<number | null>(null)
+  const access = useQuery({
+    queryKey: ['user-access', user.id],
+    queryFn: () => api<UserCompanyAccess[]>(`/org/user-access/${user.id}`, { withCompany: false }),
+  })
+  // Société courante en premier, puis celles où la personne a accès, puis les autres.
+  const rows = [...(access.data ?? [])].sort(
+    (x, y) =>
+      Number(y.company.id === current?.id) - Number(x.company.id === current?.id) ||
+      Number(y.roles.length > 0) - Number(x.roles.length > 0) ||
+      x.company.name.localeCompare(y.company.name),
+  )
+
+  return (
+    <Section title="Accès aux sociétés">
+      <p className="text-sm text-muted-foreground">
+        {isSelf
+          ? 'Vous ne pouvez pas modifier vos propres accès.'
+          : 'Les rôles de la personne dans chaque société. Sans rôle, elle n\'a pas accès à la société.'}
+      </p>
+      <ErrorAlert error={access.error} />
+      {access.isPending && <LoaderCircle className="size-5 animate-spin text-muted-foreground" />}
+      <ul className="divide-y rounded-lg border">
+        {rows.map((row) => (
+          <CompanyAccessRow
+            key={row.company.id}
+            user={user}
+            row={row}
+            roles={roles}
+            isCurrent={row.company.id === current?.id}
+            editing={editing === row.company.id}
+            onEdit={(on) => setEditing(on ? row.company.id : null)}
+          />
+        ))}
+      </ul>
+    </Section>
+  )
+}
+
+function CompanyAccessRow({
   user,
+  row,
   roles,
-  locked,
-  isSelf,
-  companyName,
-  onRemoved,
+  isCurrent,
+  editing,
+  onEdit,
 }: {
   user: UserInCompany
+  row: UserCompanyAccess
   roles: Role[]
-  locked: boolean
-  isSelf: boolean
-  companyName?: string
-  onRemoved: () => void
+  isCurrent: boolean
+  editing: boolean
+  onEdit: (on: boolean) => void
 }) {
   const queryClient = useQueryClient()
-  const initial = user.roles.map((r) => r.id)
+  const initial = row.roles.map((r) => r.id)
   const [roleIds, setRoleIds] = useState<number[]>(initial)
+  const hasAccess = row.roles.length > 0
   const dirty = roleIds.length !== initial.length || roleIds.some((id) => !initial.includes(id))
-  const removing = roleIds.length === 0
+  const removing = hasAccess && roleIds.length === 0
 
   const save = useMutation({
     mutationFn: () =>
-      api<UserInCompany>(`/auth/users/${user.id}/roles`, { method: 'PUT', body: { role_ids: roleIds } }),
-    onSuccess: () => {
+      api<UserInCompany>(`/auth/users/${user.id}/companies/${row.company.id}/roles`, {
+        method: 'PUT',
+        body: { role_ids: roleIds },
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['user-access', user.id] })
       void queryClient.invalidateQueries({ queryKey: ['users'] })
       void queryClient.invalidateQueries({ queryKey: ['roles'] })
-      if (removing) onRemoved()
+      onEdit(false)
     },
   })
 
   return (
-    <Section title={`Rôles dans ${companyName ?? 'la société'}`}>
-      {isSelf && <p className="text-sm text-muted-foreground">Vous ne pouvez pas modifier vos propres rôles.</p>}
-      <RolePicker roles={roles} value={roleIds} onChange={setRoleIds} disabled={locked} />
-      <ErrorAlert error={save.error} />
-      {!locked && (
-        <div className="flex flex-wrap items-center gap-4">
+    <li className="space-y-3 p-3">
+      <div className="flex items-center gap-3">
+        <span
+          className={cn(
+            'flex size-8 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold',
+            hasAccess ? 'bg-accent/20 text-accent-foreground' : 'bg-secondary text-muted-foreground',
+          )}
+        >
+          {row.company.code.slice(0, 2)}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+            {row.company.name}
+            {isCurrent && <Badge variant="secondary">courante</Badge>}
+            {!row.company.is_active && <Badge variant="outline">désactivée</Badge>}
+          </p>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {hasAccess ? (
+              row.roles.map((r) => (
+                <Badge key={r.id} variant="secondary">
+                  {r.name}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-xs text-muted-foreground">Pas d'accès</span>
+            )}
+          </div>
+        </div>
+        {row.can_manage && !editing && (
           <Button
             type="button"
-            variant={removing ? 'destructive' : 'default'}
-            disabled={save.isPending || !dirty}
-            onClick={() => save.mutate()}
+            size="sm"
+            variant={hasAccess ? 'outline' : 'secondary'}
+            onClick={() => {
+              setRoleIds(initial)
+              save.reset()
+              onEdit(true)
+            }}
           >
-            {save.isPending && <LoaderCircle className="animate-spin" />}
-            {removing ? `Retirer l'accès à ${companyName ?? 'la société'}` : 'Enregistrer les rôles'}
+            {hasAccess ? 'Modifier' : "Donner l'accès"}
           </Button>
-          <Saved show={save.isSuccess && !dirty} />
-          {removing && dirty && (
-            <p className="basis-full text-xs text-muted-foreground">
-              Sans rôle, la personne n'a plus accès à cette société. Son compte n'est pas supprimé.
+        )}
+      </div>
+
+      {editing && (
+        <div className="space-y-3 rounded-lg bg-secondary/40 p-3">
+          <RolePicker roles={roles} value={roleIds} onChange={setRoleIds} grantableIds={row.grantable_role_ids} />
+          <ErrorAlert error={save.error} />
+          {removing && (
+            <p className="text-xs text-muted-foreground">
+              Sans rôle, la personne n'aura plus accès à {row.company.name}. Son compte n'est pas supprimé.
             </p>
           )}
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={() => onEdit(false)}>
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={removing ? 'destructive' : 'default'}
+              disabled={!dirty || save.isPending}
+              onClick={() => save.mutate()}
+            >
+              {save.isPending && <LoaderCircle className="animate-spin" />}
+              {removing ? "Retirer l'accès" : hasAccess ? 'Enregistrer' : "Donner l'accès"}
+            </Button>
+          </div>
         </div>
       )}
-    </Section>
+    </li>
   )
 }
 
@@ -230,7 +325,6 @@ function RolesSection({
 
 function PasswordReset({ user, locked }: { user: UserInCompany; locked: boolean }) {
   const [password, setPassword] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
   const reset = useMutation({
     mutationFn: (newPassword: string) =>
       api<void>(`/auth/users/${user.id}/password`, { method: 'POST', body: { new_password: newPassword } }),
@@ -244,19 +338,7 @@ function PasswordReset({ user, locked }: { user: UserInCompany; locked: boolean 
         <Saved show>Mot de passe réinitialisé, ses sessions ont été fermées.</Saved>
         <div className="flex gap-2">
           <Input readOnly value={password} className="font-mono" aria-label="Nouveau mot de passe" />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Copier le mot de passe"
-            title={copied ? 'Copié' : 'Copier'}
-            onClick={async () => {
-              await navigator.clipboard.writeText(password)
-              setCopied(true)
-            }}
-          >
-            <Copy />
-          </Button>
+          <CopyButton value={password} label="Copier le mot de passe" />
         </div>
         <p className="text-xs text-muted-foreground">
           Notez-le maintenant : il ne sera plus affiché. Transmettez-le par un canal sûr.

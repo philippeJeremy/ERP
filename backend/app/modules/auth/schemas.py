@@ -81,6 +81,18 @@ class UserRolesUpdate(Schema):
     role_ids: list[int]
 
 
+class CompanyAccessInfo(Schema):
+    """Accès d'un utilisateur à une société, vu par l'administrateur connecté."""
+
+    company_id: int
+    roles: list[RoleRef]
+    # L'administrateur connecté peut-il modifier ces rôles (droit auth:manage dans
+    # cette société, et ce n'est pas son propre compte) ?
+    can_manage: bool
+    # Rôles qu'il a le droit d'attribuer DANS cette société (règle anti-escalade).
+    grantable_role_ids: list[int]
+
+
 class PasswordReset(Schema):
     new_password: str = Field(min_length=12, max_length=128)
 

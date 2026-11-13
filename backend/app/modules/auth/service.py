@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -21,9 +22,11 @@ from app.core.security import (
 )
 from app.modules import all_permissions
 from app.modules.auth import repository as repo
+from app.modules.auth.deps import run_company_guards
 from app.modules.auth.models import RefreshToken, Role, RolePermission, User, UserCompanyRole
 from app.modules.auth.schemas import (
     CompanyAccess,
+    CompanyAccessInfo,
     Me,
     PasswordChange,
     ProfileUpdate,
@@ -394,20 +397,107 @@ def set_user_roles(
     db: Session, ctx: RequestContext, user_id: int, role_ids: list[int]
 ) -> UserInCompany:
     """Remplace ses rôles dans la société courante (liste vide = retirer son accès)."""
-    user = _get_member(db, ctx, user_id)
+    return _apply_roles(db, ctx, _get_member(db, ctx, user_id), role_ids)
+
+
+def _apply_roles(
+    db: Session, ctx: RequestContext, user: User, role_ids: list[int]
+) -> UserInCompany:
+    """Remplace les rôles de `user` dans la société `ctx.company_id`.
+
+    `ctx` porte les permissions de l'administrateur DANS cette société : la règle
+    anti-escalade s'applique société par société.
+    """
     if user.id == ctx.user_id:
         raise DomainError("Vous ne pouvez pas modifier vos propres rôles")
     current = {r.id: r for r in repo.roles_in_company(db, user.id, ctx.company_id)}
     wanted = set(role_ids)
-
-    for role_id in wanted - set(current):
-        _assign(db, ctx, user.id, role_id)
-    for role_id in set(current) - wanted:
-        if not _can_grant(ctx, current[role_id]):
-            raise Forbidden(f"Vous ne pouvez pas retirer le rôle « {current[role_id].name} »")
-        repo.remove_role(db, user.id, ctx.company_id, role_id)
+    try:
+        for role_id in wanted - set(current):
+            _assign(db, ctx, user.id, role_id)
+        for role_id in set(current) - wanted:
+            if not _can_grant(ctx, current[role_id]):
+                raise Forbidden(f"Vous ne pouvez pas retirer le rôle « {current[role_id].name} »")
+            repo.remove_role(db, user.id, ctx.company_id, role_id)
+        db.flush()
+    except IntegrityError as exc:  # société inexistante (clé étrangère)
+        db.rollback()
+        raise NotFound("Société introuvable") from exc
     db.commit()
     return _user_view(db, ctx, user)
+
+
+# --- Accès d'un utilisateur à TOUTES les sociétés -----------------------------------
+
+
+def _company_ctx(db: Session, caller: RequestContext, company_id: int) -> RequestContext:
+    """L'administrateur connecté, avec ses permissions DANS une autre société."""
+    permissions = repo.permissions_in_company(db, caller.user_id, company_id) or set()
+    return RequestContext(
+        user_id=caller.user_id,
+        is_superuser=caller.is_superuser,
+        company_id=company_id,
+        permissions=frozenset(permissions),
+    )
+
+
+def _visible_user(db: Session, caller: RequestContext, user_id: int) -> User:
+    """L'utilisateur, s'il partage avec l'appelant une société où celui-ci voit les comptes."""
+    user = repo.get_user(db, user_id)
+    if user is None:
+        raise NotFound("Utilisateur introuvable")
+    if caller.is_superuser:
+        return user
+    shared = repo.company_ids_of(db, user_id) & repo.company_ids_of(db, caller.user_id)
+    if not any(_company_ctx(db, caller, c).has("auth:read") for c in shared):
+        raise NotFound("Utilisateur introuvable")
+    return user
+
+
+def user_company_access(
+    db: Session, caller: RequestContext, user_id: int, company_ids: list[int]
+) -> list[CompanyAccessInfo]:
+    """Rôles de l'utilisateur dans chacune des sociétés données (celles de l'appelant).
+
+    Une société où l'appelant n'a pas le droit de voir les comptes est omise : il
+    n'a pas à savoir qui y travaille.
+    """
+    user = _visible_user(db, caller, user_id)
+    all_roles = repo.list_roles(db)
+    result = []
+    for company_id in company_ids:
+        cctx = _company_ctx(db, caller, company_id)
+        if not cctx.has("auth:read"):
+            continue
+        can_manage = user.id != caller.user_id and cctx.has("auth:manage")
+        result.append(
+            CompanyAccessInfo(
+                company_id=company_id,
+                roles=[
+                    RoleRef.model_validate(r)
+                    for r in repo.roles_in_company(db, user.id, company_id)
+                ],
+                can_manage=can_manage,
+                grantable_role_ids=(
+                    [r.id for r in all_roles if _can_grant(cctx, r)] if can_manage else []
+                ),
+            )
+        )
+    return result
+
+
+def set_roles_in_company(
+    db: Session, caller: RequestContext, user_id: int, company_id: int, role_ids: list[int]
+) -> UserInCompany:
+    """Donne, modifie ou retire (liste vide) l'accès d'un utilisateur à une société."""
+    user = _visible_user(db, caller, user_id)
+    cctx = _company_ctx(db, caller, company_id)
+    if not caller.is_superuser:
+        if not cctx.has("auth:manage"):
+            raise Forbidden("Vous n'avez pas le droit de gérer les accès à cette société")
+        run_company_guards(db, company_id)  # société désactivée : refusée
+    set_db_context(db, user_id=caller.user_id, company_id=company_id)  # pour l'audit
+    return _apply_roles(db, cctx, user, role_ids)
 
 
 def assign_role(db: Session, ctx: RequestContext, user_id: int, role_id: int) -> None:

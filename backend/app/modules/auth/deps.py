@@ -36,6 +36,11 @@ def add_company_guard(guard: CompanyGuard) -> None:
         _company_guards.append(guard)
 
 
+def run_company_guards(db: Session, company_id: int) -> None:
+    for guard in _company_guards:
+        guard(db, company_id)
+
+
 def _build_context(
     token: str, x_company_id: int | None, db: Session, *, allow_password_pending: bool
 ) -> RequestContext:

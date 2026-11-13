@@ -85,3 +85,25 @@ class SequenceUpdate(Schema):
     prefix: str | None = Field(None, max_length=30)
     padding: int | None = Field(None, ge=1, le=12)
     reset_yearly: bool | None = None
+
+
+class CompanyBrief(ReadSchema):
+    id: int
+    code: str
+    name: str
+    is_active: bool
+
+
+class RoleBrief(Schema):
+    id: int
+    code: str
+    name: str
+
+
+class UserCompanyAccess(Schema):
+    """Accès d'un utilisateur à une société (écran « Accès aux sociétés »)."""
+
+    company: CompanyBrief
+    roles: list[RoleBrief]
+    can_manage: bool
+    grantable_role_ids: list[int]

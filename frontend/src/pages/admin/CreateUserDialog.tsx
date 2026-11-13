@@ -1,13 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Copy, LoaderCircle, RefreshCw } from 'lucide-react'
+import { LoaderCircle, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { z } from 'zod'
 
 import { useAuth } from '@/auth/useAuth'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { CopyButton } from '@/components/ui/copy-button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ErrorAlert, Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
@@ -27,7 +28,6 @@ export function CreateUserDialog({ roles, onClose }: { roles: Role[]; onClose: (
   const { company } = useAuth()
   const queryClient = useQueryClient()
   const [roleIds, setRoleIds] = useState<number[]>([])
-  const [copied, setCopied] = useState(false)
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: { full_name: '', email: '', password: generatePassword() },
@@ -52,14 +52,9 @@ export function CreateUserDialog({ roles, onClose }: { roles: Role[]; onClose: (
       }),
     onSuccess: done,
   })
+  const password = useWatch({ control: form.control, name: 'password' })
   const exists = create.error instanceof ApiError && create.error.code === 'compte_existant'
   const errors = form.formState.errors
-
-  const copyPassword = async () => {
-    await navigator.clipboard.writeText(form.getValues('password'))
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -93,9 +88,7 @@ export function CreateUserDialog({ roles, onClose }: { roles: Role[]; onClose: (
               >
                 <RefreshCw />
               </Button>
-              <Button type="button" variant="outline" size="icon" onClick={copyPassword} aria-label="Copier le mot de passe" title={copied ? 'Copié' : 'Copier'}>
-                <Copy />
-              </Button>
+              <CopyButton value={password} label="Copier le mot de passe" />
             </div>
           </Field>
 

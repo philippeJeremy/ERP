@@ -237,6 +237,21 @@ def set_user_roles(
     return service.set_user_roles(db, ctx, user_id, data.role_ids)
 
 
+@router.put("/users/{user_id}/companies/{company_id}/roles", response_model=UserInCompany)
+def set_roles_in_company(
+    user_id: int,
+    company_id: int,
+    data: UserRolesUpdate,
+    db: Session = Depends(get_db),
+    ctx: RequestContext = Depends(get_context),
+):
+    """Donne, modifie ou retire (liste vide) l'accès de l'utilisateur à une société.
+
+    Le droit auth:manage est vérifié DANS la société visée (pas la société courante).
+    """
+    return service.set_roles_in_company(db, ctx, user_id, company_id, data.role_ids)
+
+
 @router.post("/users/{user_id}/roles", status_code=status.HTTP_204_NO_CONTENT)
 def assign_role(
     user_id: int,

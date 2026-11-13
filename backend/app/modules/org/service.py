@@ -11,7 +11,14 @@ from app.core.errors import Conflict, Forbidden, NotFound
 from app.modules.auth import public as auth
 from app.modules.org import repository as repo
 from app.modules.org.models import Company, NumberSequence
-from app.modules.org.schemas import CompanyCreate, CompanyUpdate, SequenceUpdate
+from app.modules.org.schemas import (
+    CompanyBrief,
+    CompanyCreate,
+    CompanyUpdate,
+    RoleBrief,
+    SequenceUpdate,
+    UserCompanyAccess,
+)
 
 NOT_NULL_FIELDS = {"name", "country_code", "currency", "is_active"}
 
@@ -41,6 +48,25 @@ def list_companies_for(db: Session, ctx: RequestContext) -> list[Company]:
         return repo.list_companies(db)
     companies = repo.list_companies(db, auth.company_ids_of(db, ctx.user_id))
     return [c for c in companies if c.is_active]
+
+
+def user_access(db: Session, ctx: RequestContext, user_id: int) -> list[UserCompanyAccess]:
+    """Les sociétés de l'administrateur connecté, avec les rôles qu'y a l'utilisateur."""
+    companies = list_companies_for(db, ctx)
+    infos = {
+        info.company_id: info
+        for info in auth.user_company_access(db, ctx, user_id, [c.id for c in companies])
+    }
+    return [
+        UserCompanyAccess(
+            company=CompanyBrief.model_validate(c),
+            roles=[RoleBrief(**r.model_dump()) for r in infos[c.id].roles],
+            can_manage=infos[c.id].can_manage,
+            grantable_role_ids=infos[c.id].grantable_role_ids,
+        )
+        for c in companies
+        if c.id in infos
+    ]
 
 
 def get_company(db: Session, ctx: RequestContext, company_id: int) -> Company:

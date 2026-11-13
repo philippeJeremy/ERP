@@ -13,6 +13,7 @@ from app.modules.org.schemas import (
     CompanyUpdate,
     SequenceRead,
     SequenceUpdate,
+    UserCompanyAccess,
 )
 
 router = APIRouter(prefix="/org", tags=["Sociétés"])
@@ -58,6 +59,14 @@ def delete_company(
 ):
     """Supprime une société vide. Avec des données : 409, la désactiver à la place."""
     service.delete_company(db, ctx, company_id)
+
+
+@router.get("/user-access/{user_id}", response_model=list[UserCompanyAccess])
+def user_access(
+    user_id: int, db: Session = Depends(get_db), ctx: RequestContext = Depends(get_context)
+):
+    """À quelles sociétés (parmi les vôtres) l'utilisateur a accès, et avec quels rôles."""
+    return service.user_access(db, ctx, user_id)
 
 
 @router.get("/sequences", response_model=list[SequenceRead])

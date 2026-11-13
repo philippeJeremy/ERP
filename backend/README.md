@@ -55,6 +55,8 @@ Documentation interactive (dev) : http://127.0.0.1:8000/docs. Utiliser le bouton
 | `PATCH /auth/users/{id}` | `auth:manage` | Nom, e-mail, activation (désactiver ferme ses sessions) |
 | `POST /auth/users/{id}/password` | `auth:manage` | Réinitialiser le mot de passe (ferme ses sessions) |
 | `PUT /auth/users/{id}/roles` | `auth:manage` | Remplacer ses rôles dans la société (vide = retirer l'accès) |
+| `GET /org/user-access/{id}` | connecté | Ses rôles dans chacune de VOS sociétés (+ ce que vous pouvez y attribuer) |
+| `PUT /auth/users/{id}/companies/{company_id}/roles` | `auth:manage` dans cette société | Donner / modifier / retirer l'accès à une société |
 | `POST/PATCH/DELETE /auth/roles…` | super-admin | Rôles, communs à tout le groupe |
 
 Règles anti-escalade (dans `auth/service.py`, testées dans `tests/test_admin_utilisateurs.py`) :

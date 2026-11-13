@@ -19,7 +19,7 @@ export function UsersTab() {
   const canManage = can(me?.permissions, 'auth:manage')
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
-  const [editingId, setEditingId] = useState<number | null>(null)
+  const [opened, setOpened] = useState<UserInCompany | null>(null)
 
   // La clé contient la société : chaque société a sa propre liste en cache.
   const users = useQuery({
@@ -39,7 +39,9 @@ export function UsersTab() {
         u.roles.some((r) => r.name.toLowerCase().includes(q)),
     )
   }, [users.data, search])
-  const editing = users.data?.find((u) => u.id === editingId) ?? null
+  // Données à jour si la personne est dans la liste ; sinon (accès à la société courante
+  // retiré depuis sa fiche), on garde la fiche ouverte avec les dernières données connues.
+  const editing = opened ? (users.data?.find((u) => u.id === opened.id) ?? opened) : null
 
   return (
     <div className="space-y-4">
@@ -95,7 +97,7 @@ export function UsersTab() {
             {filtered.map((u) => (
               <tr
                 key={u.id}
-                onClick={() => setEditingId(u.id)}
+                onClick={() => setOpened(u)}
                 className="cursor-pointer transition-colors hover:bg-secondary/40"
               >
                 <td className="px-4 py-3">
@@ -141,7 +143,7 @@ export function UsersTab() {
           user={editing}
           roles={roles.data ?? []}
           canManage={canManage}
-          onClose={() => setEditingId(null)}
+          onClose={() => setOpened(null)}
         />
       )}
     </div>
