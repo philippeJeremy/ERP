@@ -16,6 +16,8 @@ dependencies = [
     "pyjwt>=2.15",
     "argon2-cffi>=25.1",          # hash des mots de passe (Argon2id)
     "arq>=0.28",                  # tâches de fond sur Redis
+    "openpyxl>=3.1",              # lecture des fichiers fournisseurs Excel (.xlsx)
+    "xlrd>=2.0",                  # anciens fichiers Excel (.xls)
 ]
 
 [project.optional-dependencies]

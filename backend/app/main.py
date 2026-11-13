@@ -13,6 +13,7 @@ from app.core.logging import setup_logging
 settings = get_settings()
 setup_logging(settings.log_level)
 modules.load_models()
+modules.load_jobs()
 
 app = FastAPI(
     title="ERP",

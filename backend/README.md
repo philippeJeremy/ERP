@@ -91,6 +91,29 @@ Contrôles : SIRET 14 chiffres et unique par société, IBAN (clé modulo 97), B
 pas de boucle dans les groupements ; une seule adresse principale par type et un seul
 interlocuteur principal.
 
+## Catalogue et imports tarifs (module `catalog`)
+
+- **Articles communs au groupe** (pas de RLS) : `catalog.articles` (code `A0000001`
+  tiré d'une séquence, EAN unique et vérifié, marque, désignation, type pneu / pièce /
+  accessoire), `catalog.brands`, `catalog.tire_specs` (dimension, indices, saison, type
+  de véhicule, XL, runflat, 3PMSF, étiquette UE, n° EPREL ; `size_code` « 2055516 »
+  pour la recherche). `tires.py` lit la dimension dans une désignation.
+- **Par société** (RLS) : `article_suppliers` (référence fournisseur, prix d'achat à
+  4 décimales, préféré, arrêté), `import_profiles`, `import_runs`, `import_lines`.
+- Permissions : `catalog:read`, `catalog:manage`, `catalog:import`.
+
+Import d'un tarif : `POST /catalog/imports/preview` (10 premières lignes + correspondance
+proposée) → profil (`/catalog/import-profiles`, mémorisé par fournisseur) →
+`POST /catalog/imports` (fichier stocké en base, analyse en tâche de fond) →
+`GET /catalog/imports/{id}` et `/lines?status=` (aperçu) → `POST …/apply`
+(une transaction, tout ou rien) ou `…/cancel`. Un import ne modifie jamais une fiche
+article existante (catalogue commun), seulement le prix et le statut chez ce fournisseur.
+Fichier complet : les articles absents sont arrêtés ; au-delà de 30 % (et 10 articles),
+`confirm_discontinue` est exigé (409 `confirmation_requise`).
+
+Tâches de fond : `app/core/jobs.py` (`@job("nom")`, `enqueue("nom", …)`), exécutées par
+le worker ARQ ; `JOBS_INLINE=true` les exécute dans l'API (tests, dev sans worker).
+
 ## Organisation du code
 
 ```

@@ -6,16 +6,24 @@ que de modules placés AVANT lui dans la liste.
 """
 
 from importlib import import_module
+from importlib.util import find_spec
 
 from fastapi import APIRouter
 
-MODULES = ["auth", "org", "partners"]
+MODULES = ["auth", "org", "partners", "catalog"]
 
 
 def load_models() -> None:
     """Importe tous les modèles pour que SQLAlchemy et Alembic connaissent toutes les tables."""
     for name in MODULES:
         import_module(f"app.modules.{name}.models")
+
+
+def load_jobs() -> None:
+    """Importe les tâches de fond des modules (fichier `jobs.py` facultatif)."""
+    for name in MODULES:
+        if find_spec(f"app.modules.{name}.jobs") is not None:
+            import_module(f"app.modules.{name}.jobs")
 
 
 def routers() -> list[APIRouter]:

@@ -152,11 +152,14 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     if (options.withCompany !== false && companyId !== null) {
       headers['X-Company-Id'] = String(companyId)
     }
-    if (options.body !== undefined) headers['Content-Type'] = 'application/json'
+    // FormData (envoi de fichier) : le navigateur pose lui-même le Content-Type
+    // « multipart/form-data » avec sa délimitation ; sinon, du JSON.
+    const isForm = options.body instanceof FormData
+    if (options.body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
     return fetch(`${API_BASE}${path}`, {
       method: options.method ?? 'GET',
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
     })
   }
 

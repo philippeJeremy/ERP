@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     migration_database_url: str | None = None
 
     redis_url: str = "redis://redis:6379/0"
+    # true : les tâches de fond s'exécutent tout de suite dans le processus de l'API
+    # (tests, dev sans worker). En production : false, le worker ARQ les exécute.
+    jobs_inline: bool = False
+    # Taille maximale d'un fichier fournisseur importé.
+    import_max_mb: int = 20
 
     jwt_secret: SecretStr
     jwt_algorithm: str = "HS256"

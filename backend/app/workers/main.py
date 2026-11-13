@@ -4,6 +4,7 @@ Lancement : arq app.workers.main.WorkerSettings
 Les vraies tâches (PDF de factures, exports, e-mails) viendront avec les modules.
 """
 
+import asyncio
 import logging
 
 from arq import cron
@@ -33,14 +34,24 @@ async def purge_sessions(ctx: dict) -> int:
     return count
 
 
+async def run_registered_job(ctx: dict, name: str, *args: object) -> object:
+    """Exécute une tâche du registre (app/core/jobs.py) dans un thread : le code métier
+    est synchrone (SQLAlchemy sync) et ne doit pas bloquer la boucle du worker."""
+    from app.core.jobs import JOBS
+
+    log.info("tâche %s %s", name, args)
+    return await asyncio.to_thread(JOBS[name], *args)
+
+
 async def startup(ctx: dict) -> None:
     setup_logging(get_settings().log_level)
     modules.load_models()
+    modules.load_jobs()
     log.info("worker démarré")
 
 
 class WorkerSettings:
-    functions = [ping]
+    functions = [ping, run_registered_job]
     cron_jobs = [cron(purge_sessions, hour=3, minute=17)]  # heure UTC
     on_startup = startup
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)

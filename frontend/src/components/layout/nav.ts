@@ -3,6 +3,7 @@ import {
   Building2,
   Factory,
   LayoutDashboard,
+  Package,
   ReceiptText,
   ShieldCheck,
   ShoppingCart,
@@ -35,6 +36,7 @@ export const NAVIGATION: NavSection[] = [
     title: 'Gestion',
     items: [
       { label: 'Fournisseurs', to: '/fournisseurs', icon: Factory, permission: 'partners:read' },
+      { label: 'Articles', to: '/articles', icon: Package, permission: 'catalog:read' },
       { label: 'Clients', to: '/clients', icon: Users, soon: true },
       { label: 'Ventes', to: '/ventes', icon: ShoppingCart, soon: true },
       { label: 'Achats', to: '/achats', icon: Truck, soon: true },

@@ -18,6 +18,8 @@ os.environ.setdefault(
 )
 os.environ.setdefault("JWT_SECRET", "secret-de-test-uniquement-0123456789abcdef")
 os.environ.setdefault("ENVIRONMENT", "test")
+# Tâches de fond exécutées tout de suite, sans worker ni Redis.
+os.environ.setdefault("JOBS_INLINE", "true")
 
 HAS_DB = bool(os.environ.get("TEST_DATABASE_URL"))
 

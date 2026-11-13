@@ -30,6 +30,7 @@ import { ErrorAlert } from '@/components/ui/field'
 import { api, ApiError } from '@/lib/api'
 import { can } from '@/lib/permissions'
 import { cn } from '@/lib/utils'
+import { SupplierArticlesTab } from '@/pages/catalog/SupplierArticlesTab'
 import { AddressesTab } from '@/pages/partners/AddressesTab'
 import { ContactsTab } from '@/pages/partners/ContactsTab'
 import { InfoForm, TermsForm } from '@/pages/partners/SupplierForms'
@@ -170,16 +171,7 @@ export function SupplierPage() {
             <ContactsTab partner={p} readOnly={readOnly} />
           </div>
         )}
-        {tab === 'articles' && (
-          <div className="flex flex-col items-center gap-2 pt-6 pb-12 text-center">
-            <Boxes className="size-8 text-muted-foreground/60" />
-            <p className="font-medium">Bientôt : les articles de ce fournisseur</p>
-            <p className="max-w-md text-sm text-muted-foreground">
-              Avec le module Articles, chaque article pourra être relié à un ou plusieurs fournisseurs : leur référence,
-              le prix d'achat, le délai et le fournisseur préféré.
-            </p>
-          </div>
-        )}
+        {tab === 'articles' && <SupplierArticlesTab partnerId={p.id} />}
       </div>
 
       {deleting && <DeleteDialog partner={p} onClose={() => setDeleting(false)} />}

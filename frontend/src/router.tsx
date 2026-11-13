@@ -8,6 +8,11 @@ import { ForcePasswordPage } from '@/pages/ForcePasswordPage'
 import { HomePage } from '@/pages/HomePage'
 import { LoginPage } from '@/pages/LoginPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
+import { ArticlePage } from '@/pages/catalog/ArticlePage'
+import { ArticlesPage } from '@/pages/catalog/ArticlesPage'
+import { ImportRunPage } from '@/pages/catalog/ImportRunPage'
+import { ImportsPage } from '@/pages/catalog/ImportsPage'
+import { NewImportPage } from '@/pages/catalog/NewImportPage'
 import { SupplierPage } from '@/pages/partners/SupplierPage'
 import { SuppliersPage } from '@/pages/partners/SuppliersPage'
 import { ProfilePage } from '@/pages/ProfilePage'
@@ -26,6 +31,11 @@ export const router = createBrowserRouter([
           { path: 'profil', element: <ProfilePage /> },
           { path: 'fournisseurs', element: <SuppliersPage /> },
           { path: 'fournisseurs/:id', element: <SupplierPage /> },
+          { path: 'articles', element: <ArticlesPage /> },
+          { path: 'articles/imports', element: <ImportsPage /> },
+          { path: 'articles/imports/nouveau', element: <NewImportPage /> },
+          { path: 'articles/imports/:id', element: <ImportRunPage /> },
+          { path: 'articles/:id', element: <ArticlePage /> },
           { path: 'admin/utilisateurs', element: <UsersAdminPage /> },
           { path: 'admin/societes', element: <CompaniesPage /> },
         ],

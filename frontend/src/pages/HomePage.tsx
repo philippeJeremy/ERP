@@ -12,6 +12,7 @@ import { can } from '@/lib/permissions'
 
 const DESCRIPTIONS: Record<string, string> = {
   Fournisseurs: 'Référentiel fournisseurs : adresses, contacts, conditions d’achat et banque.',
+  Articles: 'Pneus, pièces et accessoires ; prix d’achat et imports des tarifs fournisseurs.',
   Clients: 'Fiches clients, adresses de facturation et de livraison, conditions de vente.',
   Ventes: 'Devis, commandes clients et suivi des livraisons.',
   Achats: 'Commandes fournisseurs et réceptions.',

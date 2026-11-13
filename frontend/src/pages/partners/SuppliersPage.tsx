@@ -22,6 +22,7 @@ import { ErrorAlert } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { api } from '@/lib/api'
 import { can } from '@/lib/permissions'
+import { useDebounced } from '@/lib/useDebounced'
 import { cn } from '@/lib/utils'
 import { CreateSupplierDialog } from '@/pages/partners/CreateSupplierDialog'
 import type { PartnerListItem, PartnerPage } from '@/pages/partners/types'
@@ -86,16 +87,6 @@ const HIDDEN_ON_MOBILE: Record<string, string> = {
   phone: 'hidden xl:table-cell',
 }
 const NO_ROWS: PartnerListItem[] = []
-
-/** Valeur qui ne change qu'après `delay` ms sans frappe : une requête par pause, pas par touche. */
-function useDebounced<T>(value: T, delay = 300): T {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay)
-    return () => clearTimeout(t)
-  }, [value, delay])
-  return debounced
-}
 
 export function SuppliersPage() {
   const { me, company } = useAuth()
