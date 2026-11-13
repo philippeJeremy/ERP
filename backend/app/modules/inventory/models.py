@@ -33,6 +33,7 @@ MOVE_KINDS = (
     "transfert",  # sortie (quantité négative) ou entrée (positive) d'un transfert
     "inventaire",  # écart constaté à la validation d'un inventaire
     "ajustement",  # casse, perte, correction… (avec motif)
+    "livraison",  # sortie d'une livraison client
 )
 ADJUST_REASONS = ("casse", "perte", "vol", "erreur", "retour", "echantillon", "autre")
 COUNT_STATUSES = ("en_cours", "valide", "annule")
@@ -102,6 +103,30 @@ class ArticleCost(Base):
         BigInteger, ForeignKey("catalog.articles.id"), primary_key=True
     )
     average_cost: Mapped[Decimal] = mapped_column(Numeric(14, 4), server_default="0")
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class Reservation(Base, IdMixin, CompanyScopedMixin):
+    """Quantité promise à un client (ligne de commande non encore livrée), par dépôt.
+
+    Disponible = stock du dépôt − réservations. Une réservation peut dépasser le stock :
+    la commande est alors en rupture (« à commander »), mais le stock physique, lui,
+    ne passe jamais en négatif.
+    """
+
+    __tablename__ = "reservations"
+    __table_args__ = (
+        UniqueConstraint("company_id", "source"),
+        CheckConstraint("quantity > 0", name="quantity_positive"),
+        Index("ix_reservations_article", "company_id", "article_id", "site_id"),
+        {"schema": "inventory"},
+    )
+
+    article_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("catalog.articles.id"))
+    site_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("org.sites.id"))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 3))
+    source: Mapped[str] = mapped_column(String(50))  # « sales_order_line:42 »
+    reference: Mapped[str | None] = mapped_column(String(30))  # n° de la commande
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 

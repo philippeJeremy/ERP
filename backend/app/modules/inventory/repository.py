@@ -11,6 +11,7 @@ from app.modules.inventory.models import (
     Count,
     CountLine,
     Location,
+    Reservation,
     StockLevel,
     StockMove,
     Transfer,
@@ -321,3 +322,70 @@ def open_count_on(db: Session, site_id: int) -> Count | None:
     return db.scalar(
         select(Count).where(Count.site_id == site_id, Count.status == "en_cours").limit(1)
     )
+
+
+# --- Réservations et sorties ------------------------------------------------------------
+
+
+def get_reservation(db: Session, source: str) -> Reservation | None:
+    return db.scalar(select(Reservation).where(Reservation.source == source))
+
+
+def reserved_by(db: Session, article_ids: set[int], site_id: int | None) -> dict[int, Decimal]:
+    if not article_ids:
+        return {}
+    query = (
+        select(Reservation.article_id, func.sum(Reservation.quantity))
+        .where(Reservation.article_id.in_(article_ids))
+        .group_by(Reservation.article_id)
+    )
+    if site_id is not None:
+        query = query.where(Reservation.site_id == site_id)
+    return {a: q for a, q in db.execute(query)}
+
+
+def on_hand_by(db: Session, article_ids: set[int], site_id: int | None) -> dict[int, Decimal]:
+    if not article_ids:
+        return {}
+    query = (
+        select(StockLevel.article_id, func.sum(StockLevel.quantity))
+        .where(StockLevel.article_id.in_(article_ids))
+        .group_by(StockLevel.article_id)
+    )
+    if site_id is not None:
+        query = query.where(StockLevel.site_id == site_id)
+    return {a: q for a, q in db.execute(query)}
+
+
+def reserved_by_site(db: Session, article_id: int) -> dict[int, Decimal]:
+    rows = db.execute(
+        select(Reservation.site_id, func.sum(Reservation.quantity))
+        .where(Reservation.article_id == article_id)
+        .group_by(Reservation.site_id)
+    )
+    return {s: q for s, q in rows}
+
+
+def site_levels_fifo(
+    db: Session, site_id: int, article_id: int, location_id: int | None, dot: str | None
+) -> list[StockLevel]:
+    """Lots d'un article dans un dépôt, du DOT le plus ancien au plus récent, verrouillés.
+    À DOT égal, l'emplacement par défaut (le quai) passe en dernier : on vide d'abord
+    les rayons."""
+    query = (
+        select(StockLevel)
+        .join(Location, Location.id == StockLevel.location_id)
+        .where(
+            StockLevel.site_id == site_id,
+            StockLevel.article_id == article_id,
+            StockLevel.quantity > 0,
+        )
+    )
+    if location_id is not None:
+        query = query.where(StockLevel.location_id == location_id)
+    if dot is not None:
+        query = query.where(StockLevel.dot == dot)
+    query = query.order_by(
+        DOT_ORDER.asc().nulls_last(), Location.is_default, Location.code, StockLevel.id
+    ).with_for_update(of=StockLevel)
+    return list(db.scalars(query))

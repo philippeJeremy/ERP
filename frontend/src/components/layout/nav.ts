@@ -38,8 +38,8 @@ export const NAVIGATION: NavSection[] = [
     items: [
       { label: 'Fournisseurs', to: '/fournisseurs', icon: Factory, permission: 'partners:read' },
       { label: 'Articles', to: '/articles', icon: Package, permission: 'catalog:read' },
-      { label: 'Clients', to: '/clients', icon: Users, soon: true },
-      { label: 'Ventes', to: '/ventes', icon: ShoppingCart, soon: true },
+      { label: 'Clients', to: '/clients', icon: Users, permission: 'partners:read' },
+      { label: 'Ventes', to: '/ventes', icon: ShoppingCart, permission: 'sales:read' },
       { label: 'Achats', to: '/achats', icon: Truck, permission: 'purchasing:read' },
       { label: 'Stock', to: '/stock', icon: Boxes, permission: 'inventory:read' },
       { label: 'Facturation', to: '/facturation', icon: ReceiptText, soon: true },

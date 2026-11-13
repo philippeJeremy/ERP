@@ -12,6 +12,7 @@ from sqlalchemy import (
     CheckConstraint,
     ForeignKey,
     Index,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -22,6 +23,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.shared.models import Base, BusinessEntity, CompanyScopedMixin
 
 PAYMENT_METHODS = ("virement", "prelevement", "cheque", "lcr", "carte", "especes")
+CUSTOMER_KINDS = ("pro", "particulier")
 ADDRESS_KINDS = ("siege", "commande", "enlevement", "retour", "facturation", "livraison", "autre")
 
 
@@ -51,6 +53,19 @@ class Partner(Base, BusinessEntity, CompanyScopedMixin):
         CheckConstraint("min_order_amount >= 0", name="min_order_positive"),
         CheckConstraint("free_shipping_amount >= 0", name="free_shipping_positive"),
         CheckConstraint("parent_id <> id", name="not_own_parent"),
+        CheckConstraint(_in("customer_kind", CUSTOMER_KINDS), name="customer_kind"),
+        CheckConstraint(
+            _in("customer_payment_method", PAYMENT_METHODS), name="customer_payment_method"
+        ),
+        CheckConstraint(
+            "customer_payment_days BETWEEN 0 AND 120", name="customer_payment_days_range"
+        ),
+        CheckConstraint("credit_limit >= 0", name="credit_limit_positive"),
+        CheckConstraint(
+            "discount_pct BETWEEN 0 AND 100 AND discount_tire_pct BETWEEN 0 AND 100 "
+            "AND discount_part_pct BETWEEN 0 AND 100 AND discount_accessory_pct BETWEEN 0 AND 100",
+            name="discounts_range",
+        ),
         {"schema": "partners"},
     )
 
@@ -82,6 +97,21 @@ class Partner(Base, BusinessEntity, CompanyScopedMixin):
     lead_time_days: Mapped[int | None]  # délai de livraison habituel
     min_order_amount: Mapped[Decimal | None]  # minimum de commande
     free_shipping_amount: Mapped[Decimal | None]  # franco de port : livraison offerte au-delà
+
+    # --- Conditions de vente (rôle client) ---
+    customer_kind: Mapped[str | None] = mapped_column(String(12))  # pro / particulier
+    first_name: Mapped[str | None] = mapped_column(String(100))  # particulier (nom dans `name`)
+    vehicle_registration: Mapped[str | None] = mapped_column(String(15))  # immatriculation
+    customer_account: Mapped[str | None] = mapped_column(String(20))  # compte comptable 411…
+    customer_payment_method: Mapped[str | None] = mapped_column(String(20))
+    customer_payment_days: Mapped[int | None]
+    customer_payment_end_of_month: Mapped[bool] = mapped_column(server_default="false")
+    credit_limit: Mapped[Decimal | None]  # encours autorisé
+    # Remise générale, et remises par famille d'articles (vide = la générale s'applique).
+    discount_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), server_default="0")
+    discount_tire_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    discount_part_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    discount_accessory_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
 
     # --- Banque ---
     bank_name: Mapped[str | None] = mapped_column(String(100))

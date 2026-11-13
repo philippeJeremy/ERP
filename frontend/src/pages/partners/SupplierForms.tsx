@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect, Textarea } from '@/components/ui/native-select'
 import { api } from '@/lib/api'
 import { gtinIsValid } from '@/pages/catalog/types'
-import { compact, formatIban, ibanIsValid, PAYMENT_METHODS, type Partner } from '@/pages/partners/types'
+import { compact, CUSTOMER_KINDS, formatIban, ibanIsValid, PAYMENT_METHODS, type Partner } from '@/pages/partners/types'
 
 // Dans les formulaires, un champ vide est une chaîne vide ; à l'envoi elle devient null.
 const text = (max: number) => z.string().trim().max(max, `${max} caractères maximum`)
@@ -125,6 +125,7 @@ const infoSchema = z.object({
   website: text(200),
   notes: z.string(),
   is_customer: z.boolean(),
+  is_supplier: z.boolean(),
 })
 type InfoValues = z.infer<typeof infoSchema>
 
@@ -139,23 +140,32 @@ const infoDefaults = (p: Partner): InfoValues => ({
   website: p.website ?? '',
   notes: p.notes ?? '',
   is_customer: p.is_customer,
+  is_supplier: p.is_supplier,
 })
 
-export function InfoForm({ partner, readOnly }: { partner: Partner; readOnly: boolean }) {
+export function InfoForm({ partner, readOnly, role = 'supplier' }: { partner: Partner; readOnly: boolean; role?: 'supplier' | 'customer' }) {
   const form = useForm<InfoValues>({ resolver: zodResolver(infoSchema), defaultValues: infoDefaults(partner) })
   const save = useSavePartner(partner, form, toBody, infoDefaults)
   const isCustomer = useWatch({ control: form.control, name: 'is_customer' })
+  const isSupplier = useWatch({ control: form.control, name: 'is_supplier' })
+  const individual = role === 'customer' && partner.customer_kind === 'particulier'
   const f = { form, disabled: readOnly }
 
   return (
     <form onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
-      <Section title="Identité" description="Telle qu'elle figure sur ses factures (Kbis).">
-        <TextField {...f} name="name" label="Raison sociale" className="sm:col-span-2" />
-        <TextField {...f} name="legal_form" label="Forme juridique" hint="SAS, SARL, SA…" />
-        <TextField {...f} name="siret" label="SIRET" mono hint="Identifie l'établissement (14 chiffres)" />
-        <TextField {...f} name="vat_number" label="N° de TVA intracommunautaire" mono />
-        <TextField {...f} name="gln" label="GLN" mono hint="Identifiant GS1 de l'entreprise, pour l'EDI" />
-      </Section>
+      {individual ? (
+        <Section title="Identité" description="Le prénom et le véhicule sont dans l'onglet Conditions de vente.">
+          <TextField {...f} name="name" label="Nom" className="sm:col-span-2" />
+        </Section>
+      ) : (
+        <Section title="Identité" description="Telle qu'elle figure sur ses factures (Kbis).">
+          <TextField {...f} name="name" label="Raison sociale" className="sm:col-span-2" />
+          <TextField {...f} name="legal_form" label="Forme juridique" hint="SAS, SARL, SA…" />
+          <TextField {...f} name="siret" label="SIRET" mono hint="Identifie l'établissement (14 chiffres)" />
+          <TextField {...f} name="vat_number" label="N° de TVA intracommunautaire" mono />
+          <TextField {...f} name="gln" label="GLN" mono hint="Identifiant GS1 de l'entreprise, pour l'EDI" />
+        </Section>
+      )}
       <Section title="Coordonnées" description="Le standard. Les interlocuteurs sont dans l'onglet Contacts.">
         <TextField {...f} name="email" label="E-mail" type="email" />
         <TextField {...f} name="phone" label="Téléphone" type="tel" />
@@ -167,14 +177,25 @@ export function InfoForm({ partner, readOnly }: { partner: Partner; readOnly: bo
         </div>
       </Section>
       <Section title="Rôles" description="Une même entreprise peut être fournisseur et cliente : une seule fiche.">
-        <CheckRow
-          className="sm:col-span-2"
-          checked={isCustomer}
-          disabled={readOnly}
-          onChange={(on) => form.setValue('is_customer', on, { shouldDirty: true })}
-          title="Aussi client"
-          description="Il apparaîtra aussi dans les clients (module Ventes, à venir)."
-        />
+        {role === 'supplier' ? (
+          <CheckRow
+            className="sm:col-span-2"
+            checked={isCustomer}
+            disabled={readOnly}
+            onChange={(on) => form.setValue('is_customer', on, { shouldDirty: true })}
+            title="Aussi client"
+            description="Il apparaîtra aussi dans les clients : devis, commandes, livraisons."
+          />
+        ) : (
+          <CheckRow
+            className="sm:col-span-2"
+            checked={isSupplier}
+            disabled={readOnly}
+            onChange={(on) => form.setValue('is_supplier', on, { shouldDirty: true })}
+            title="Aussi fournisseur"
+            description="Il apparaîtra aussi dans les fournisseurs : articles, commandes d'achat."
+          />
+        )}
       </Section>
       <ErrorAlert error={save.error} />
       <SaveBar form={form as never} save={save} disabled={readOnly} />
@@ -265,6 +286,113 @@ export function TermsForm({ partner, readOnly }: { partner: Partner; readOnly: b
         <TextField {...f} name="bank_name" label="Banque" className="sm:col-span-2" />
         <TextField {...f} name="iban" label="IBAN" mono className="sm:col-span-2" />
         <TextField {...f} name="bic" label="BIC" mono />
+      </Section>
+      <ErrorAlert error={save.error} />
+      <SaveBar form={form as never} save={save} disabled={readOnly} />
+    </form>
+  )
+}
+
+// --- Onglet « Conditions de vente » (clients) ------------------------------------
+
+const pct = z
+  .string()
+  .trim()
+  .refine((v) => v === '' || (/^\d{1,3}([.,]\d{1,2})?$/.test(v) && Number(v.replace(',', '.')) <= 100), 'Pourcentage de 0 à 100')
+
+const customerSchema = z.object({
+  customer_kind: z.enum(['pro', 'particulier']),
+  first_name: text(100),
+  vehicle_registration: text(15),
+  customer_payment_method: z.string(),
+  customer_payment_days: integer(0, 120),
+  customer_payment_end_of_month: z.boolean(),
+  credit_limit: amount,
+  customer_account: text(20),
+  discount_pct: pct,
+  discount_tire_pct: pct,
+  discount_part_pct: pct,
+  discount_accessory_pct: pct,
+})
+type CustomerValues = z.infer<typeof customerSchema>
+
+const num = (v: string | null) => (v === null ? '' : String(Number(v)).replace('.', ','))
+const customerDefaults = (p: Partner): CustomerValues => ({
+  customer_kind: p.customer_kind ?? 'pro',
+  first_name: p.first_name ?? '',
+  vehicle_registration: p.vehicle_registration ?? '',
+  customer_payment_method: p.customer_payment_method ?? '',
+  customer_payment_days: p.customer_payment_days?.toString() ?? '',
+  customer_payment_end_of_month: p.customer_payment_end_of_month,
+  credit_limit: p.credit_limit ?? '',
+  customer_account: p.customer_account ?? '',
+  discount_pct: num(p.discount_pct),
+  discount_tire_pct: num(p.discount_tire_pct),
+  discount_part_pct: num(p.discount_part_pct),
+  discount_accessory_pct: num(p.discount_accessory_pct),
+})
+
+export function CustomerTermsForm({ partner, readOnly }: { partner: Partner; readOnly: boolean }) {
+  const form = useForm<CustomerValues>({ resolver: zodResolver(customerSchema), defaultValues: customerDefaults(partner) })
+  const save = useSavePartner(
+    partner,
+    form,
+    (v) => {
+      const body = toBody(v)
+      body.customer_payment_days = v.customer_payment_days === '' ? null : Number(v.customer_payment_days)
+      for (const k of ['credit_limit', 'discount_tire_pct', 'discount_part_pct', 'discount_accessory_pct'] as const)
+        body[k] = v[k] === '' ? null : v[k].replace(',', '.')
+      body.discount_pct = v.discount_pct === '' ? '0' : v.discount_pct.replace(',', '.')
+      return body
+    },
+    customerDefaults,
+  )
+  const endOfMonth = useWatch({ control: form.control, name: 'customer_payment_end_of_month' })
+  const kind = useWatch({ control: form.control, name: 'customer_kind' })
+  const f = { form, disabled: readOnly }
+  return (
+    <form onSubmit={form.handleSubmit((v) => save.mutate(v))} noValidate>
+      <Section title="Profil" description="Un particulier est servi au comptoir : nom, prénom, véhicule.">
+        <Field id="p_customer_kind" label="Type de client">
+          <NativeSelect id="p_customer_kind" disabled={readOnly} {...form.register('customer_kind')}>
+            {Object.entries(CUSTOMER_KINDS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        {kind === 'particulier' ? <TextField {...f} name="first_name" label="Prénom" /> : <div className="hidden sm:block" />}
+        <TextField {...f} name="vehicle_registration" label="Immatriculation" mono hint="AB-123-CD : reprise sur les devis et BL" />
+      </Section>
+      <Section title="Remises" description="Appliquées automatiquement sur le tarif de vente. Vide = la remise générale.">
+        <TextField {...f} name="discount_pct" label="Remise générale (%)" />
+        <div className="hidden sm:block" />
+        <TextField {...f} name="discount_tire_pct" label="Pneus (%)" />
+        <TextField {...f} name="discount_part_pct" label="Pièces (%)" />
+        <TextField {...f} name="discount_accessory_pct" label="Accessoires (%)" />
+      </Section>
+      <Section title="Règlement et encours" description="L'encours est contrôlé à la confirmation des commandes.">
+        <Field id="p_customer_payment_method" label="Mode de règlement">
+          <NativeSelect id="p_customer_payment_method" disabled={readOnly} {...form.register('customer_payment_method')}>
+            <option value="">— Non précisé —</option>
+            {Object.entries(PAYMENT_METHODS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
+        <TextField {...f} name="customer_payment_days" label="Délai de paiement (jours)" hint="0 = comptant" />
+        <CheckRow
+          className="sm:col-span-2"
+          checked={endOfMonth}
+          disabled={readOnly}
+          onChange={(on) => form.setValue('customer_payment_end_of_month', on, { shouldDirty: true })}
+          title="Fin de mois"
+        />
+        <TextField {...f} name="credit_limit" label="Encours autorisé (TTC)" hint="Vide = pas de limite" />
+        <TextField {...f} name="customer_account" label="Compte comptable" mono hint="Compte client (411…)" />
       </Section>
       <ErrorAlert error={save.error} />
       <SaveBar form={form as never} save={save} disabled={readOnly} />

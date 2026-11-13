@@ -52,6 +52,18 @@ export interface Partner {
   bank_name: string | null
   iban: string | null
   bic: string | null
+  customer_kind: CustomerKind | null
+  first_name: string | null
+  vehicle_registration: string | null
+  customer_account: string | null
+  customer_payment_method: PaymentMethod | null
+  customer_payment_days: number | null
+  customer_payment_end_of_month: boolean
+  credit_limit: string | null
+  discount_pct: string
+  discount_tire_pct: string | null
+  discount_part_pct: string | null
+  discount_accessory_pct: string | null
   addresses: PartnerAddress[]
   contacts: PartnerContact[]
   version: number
@@ -88,6 +100,9 @@ export const PAYMENT_METHODS = {
 } as const
 export type PaymentMethod = keyof typeof PAYMENT_METHODS
 
+export const CUSTOMER_KINDS = { pro: 'Professionnel', particulier: 'Particulier' } as const
+export type CustomerKind = keyof typeof CUSTOMER_KINDS
+
 export const ADDRESS_KINDS = {
   siege: { label: 'Siège social', hint: 'Adresse légale' },
   commande: { label: 'Commandes', hint: 'Où envoyer les bons de commande' },
@@ -116,15 +131,21 @@ export function ibanIsValid(raw: string): boolean {
 /** « IBAN groupé par 4 » pour l'affichage : FR76 3000 6000 … */
 export const formatIban = (iban: string) => iban.replace(/(.{4})/g, '$1 ').trim()
 
-/** « 45 jours fin de mois, par virement » */
-export function describePaymentTerms(p: Partner): string | null {
+function terms(days: number | null, endOfMonth: boolean, method: PaymentMethod | null): string | null {
   const parts: string[] = []
-  if (p.payment_days !== null) {
-    parts.push(p.payment_days === 0 ? 'Comptant' : `${p.payment_days} jours${p.payment_end_of_month ? ' fin de mois' : ''}`)
-  }
-  if (p.payment_method) parts.push(`par ${PAYMENT_METHODS[p.payment_method].toLowerCase()}`)
+  if (days !== null) parts.push(days === 0 ? 'Comptant' : `${days} jours${endOfMonth ? ' fin de mois' : ''}`)
+  if (method) parts.push(`par ${PAYMENT_METHODS[method].toLowerCase()}`)
   return parts.length ? parts.join(', ') : null
 }
+
+/** « 45 jours fin de mois, par virement » (conditions d'achat) */
+export const describePaymentTerms = (p: Partner) => terms(p.payment_days, p.payment_end_of_month, p.payment_method)
+
+/** Conditions de règlement du client. */
+export const describeCustomerTerms = (p: Partner) => terms(p.customer_payment_days, p.customer_payment_end_of_month, p.customer_payment_method)
+
+/** Nom affiché : « DUPONT Jean » pour un particulier. */
+export const partnerDisplayName = (p: Pick<Partner, 'name' | 'first_name'>) => (p.first_name ? `${p.name} ${p.first_name}` : p.name)
 
 const money = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
 export function formatMoney(amount: string | null, currency = 'EUR'): string {

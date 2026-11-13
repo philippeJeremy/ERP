@@ -8,6 +8,8 @@ from app.shared.schemas import ReadSchema, Schema
 from app.shared.validators import clean_gln
 
 PaymentMethod = Literal["virement", "prelevement", "cheque", "lcr", "carte", "especes"]
+CustomerKind = Literal["pro", "particulier"]
+Pct = Field(None, ge=0, le=100, max_digits=5, decimal_places=2)
 AddressKind = Literal[
     "siege", "commande", "enlevement", "retour", "facturation", "livraison", "autre"
 ]
@@ -51,6 +53,27 @@ class _PartnerFields(Schema):
     bank_name: str | None = Field(None, max_length=100)
     iban: str | None = None
     bic: str | None = None
+    customer_kind: CustomerKind | None = None
+    first_name: str | None = Field(None, max_length=100)
+    vehicle_registration: str | None = Field(None, max_length=15)
+    customer_account: str | None = Field(None, max_length=20)
+    customer_payment_method: PaymentMethod | None = None
+    customer_payment_days: int | None = Field(None, ge=0, le=120)
+    credit_limit: Decimal | None = Field(None, ge=0, max_digits=14, decimal_places=2)
+    discount_tire_pct: Decimal | None = Pct
+    discount_part_pct: Decimal | None = Pct
+    discount_accessory_pct: Decimal | None = Pct
+
+    @field_validator("vehicle_registration", mode="before")
+    @classmethod
+    def plate(cls, v: str | None) -> str | None:
+        """« ab 123 cd » → « AB-123-CD » (format SIV), sinon tel quel."""
+        if not v:
+            return None
+        raw = "".join(c for c in v.upper() if c.isalnum())
+        if len(raw) == 7 and raw[:2].isalpha() and raw[2:5].isdigit() and raw[5:].isalpha():
+            return f"{raw[:2]}-{raw[2:5]}-{raw[5:]}"
+        return v.strip().upper()
 
     @field_validator("siret", "vat_number", "iban", "bic", mode="before")
     @classmethod
@@ -94,6 +117,8 @@ class PartnerCreate(_PartnerFields):
     is_customer: bool = False
     payment_end_of_month: bool = False
     currency: str = Field("EUR", pattern=r"^[A-Z]{3}$")
+    customer_payment_end_of_month: bool = False
+    discount_pct: Decimal = Field(Decimal(0), ge=0, le=100, max_digits=5, decimal_places=2)
 
 
 class PartnerUpdate(_PartnerFields):
@@ -104,6 +129,8 @@ class PartnerUpdate(_PartnerFields):
     is_active: bool | None = None
     payment_end_of_month: bool | None = None
     currency: str | None = Field(None, pattern=r"^[A-Z]{3}$")
+    customer_payment_end_of_month: bool | None = None
+    discount_pct: Decimal | None = Pct
 
 
 class PartnerRef(ReadSchema):
@@ -192,6 +219,18 @@ class PartnerRead(ReadSchema):
     bank_name: str | None
     iban: str | None
     bic: str | None
+    customer_kind: str | None
+    first_name: str | None
+    vehicle_registration: str | None
+    customer_account: str | None
+    customer_payment_method: str | None
+    customer_payment_days: int | None
+    customer_payment_end_of_month: bool
+    credit_limit: Decimal | None
+    discount_pct: Decimal
+    discount_tire_pct: Decimal | None
+    discount_part_pct: Decimal | None
+    discount_accessory_pct: Decimal | None
     addresses: list[AddressRead]
     contacts: list[ContactRead]
     version: int

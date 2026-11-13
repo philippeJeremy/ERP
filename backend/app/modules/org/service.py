@@ -35,6 +35,7 @@ DEFAULT_SEQUENCES = [
     ("reception", "Réceptions fournisseur", "BR-{year}-", True),
     ("transfer", "Transferts de stock", "TR-{year}-", True),
     ("stock_count", "Inventaires", "INV-{year}-", True),
+    ("delivery", "Bons de livraison client", "BL-{year}-", True),
 ]
 
 

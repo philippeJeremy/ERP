@@ -13,6 +13,11 @@ import { ArticlesPage } from '@/pages/catalog/ArticlesPage'
 import { ImportRunPage } from '@/pages/catalog/ImportRunPage'
 import { ImportsPage } from '@/pages/catalog/ImportsPage'
 import { NewImportPage } from '@/pages/catalog/NewImportPage'
+import { CustomerPage } from '@/pages/customers/CustomerPage'
+import { CustomersPage } from '@/pages/customers/CustomersPage'
+import { OrderPage } from '@/pages/sales/OrderPage'
+import { QuotePage } from '@/pages/sales/QuotePage'
+import { SalesPage } from '@/pages/sales/SalesPage'
 import { CountPage } from '@/pages/inventory/CountPage'
 import { StockPage } from '@/pages/inventory/StockPage'
 import { SitesPage } from '@/pages/admin/SitesPage'
@@ -37,6 +42,11 @@ export const router = createBrowserRouter([
           { path: 'fournisseurs', element: <SuppliersPage /> },
           { path: 'fournisseurs/:id', element: <SupplierPage /> },
           { path: 'articles', element: <ArticlesPage /> },
+          { path: 'clients', element: <CustomersPage /> },
+          { path: 'clients/:id', element: <CustomerPage /> },
+          { path: 'ventes', element: <SalesPage /> },
+          { path: 'ventes/devis/:id', element: <QuotePage /> },
+          { path: 'ventes/commandes/:id', element: <OrderPage /> },
           { path: 'achats', element: <PurchaseOrdersPage /> },
           { path: 'achats/:id', element: <PurchaseOrderPage /> },
           { path: 'admin/depots', element: <SitesPage /> },

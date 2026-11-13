@@ -33,6 +33,8 @@ export interface Location {
 export interface StockRow {
   article: ArticleBrief
   quantity: string
+  reserved: string
+  available: string
   average_cost: string
   value: string
   oldest_dot: string | null
@@ -45,7 +47,7 @@ export interface StockPage {
   total_value: string
 }
 
-export type MoveKind = 'reception' | 'transfert' | 'inventaire' | 'ajustement'
+export type MoveKind = 'reception' | 'transfert' | 'inventaire' | 'ajustement' | 'livraison'
 
 export interface Move {
   id: number
@@ -69,6 +71,8 @@ export interface ArticleStock {
   quantity: string
   average_cost: string
   value: string
+  reserved: string
+  sites: { site: SiteBrief; quantity: string; reserved: string; available: string }[]
   levels: { site: SiteBrief; location: LocationBrief; dot: string; quantity: string }[]
   moves: Move[]
 }
@@ -125,6 +129,7 @@ export const MOVE_KINDS: Record<MoveKind, string> = {
   transfert: 'Transfert',
   inventaire: 'Inventaire',
   ajustement: 'Ajustement',
+  livraison: 'Livraison',
 }
 
 export const ADJUST_REASONS = {

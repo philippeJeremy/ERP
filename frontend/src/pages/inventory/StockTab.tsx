@@ -47,12 +47,22 @@ const columns = helper.columns([
   }),
   helper.accessor('oldest_dot', { header: 'Plus vieux DOT', cell: (i) => <DotBadge dot={i.getValue()} /> }),
   helper.accessor('quantity', { header: 'Quantité', cell: (i) => <span className="font-medium tabular-nums">{fmtQty(i.getValue())}</span> }),
+  helper.accessor('reserved', {
+    header: 'Réservé',
+    cell: (i) => (Number(i.getValue()) ? <span className="tabular-nums text-muted-foreground">{fmtQty(i.getValue())}</span> : ''),
+  }),
+  helper.accessor('available', {
+    header: 'Disponible',
+    cell: (i) => <span className={cn('font-medium tabular-nums', Number(i.getValue()) < 0 && 'text-destructive')}>{fmtQty(i.getValue())}</span>,
+  }),
   helper.accessor('average_cost', { header: 'CMP', cell: (i) => <span className="tabular-nums text-muted-foreground">{fmtCost(i.getValue())}</span> }),
   helper.accessor('value', { header: 'Valeur', cell: (i) => <span className="font-medium tabular-nums">{fmtMoney(i.getValue())}</span> }),
 ])
 const CELL: Record<string, string> = {
   oldest_dot: 'hidden sm:table-cell',
   quantity: 'text-right',
+  reserved: 'hidden lg:table-cell text-right',
+  available: 'text-right',
   average_cost: 'hidden md:table-cell text-right',
   value: 'text-right',
 }

@@ -24,7 +24,7 @@ export function DotBadge({ dot }: { dot: string | null | undefined }) {
   )
 }
 
-const KIND_VARIANT = { reception: 'success', transfert: 'secondary', inventaire: 'accent', ajustement: 'outline' } as const
+const KIND_VARIANT = { reception: 'success', transfert: 'secondary', inventaire: 'accent', ajustement: 'outline', livraison: 'secondary' } as const
 
 export function MoveKindBadge({ move }: { move: Move }) {
   return <Badge variant={KIND_VARIANT[move.kind]}>{MOVE_KINDS[move.kind]}</Badge>
@@ -34,6 +34,7 @@ export function MoveKindBadge({ move }: { move: Move }) {
 function MoveSource({ move }: { move: Move }) {
   const [type, id] = (move.source ?? '').split(':')
   if (type === 'count') return <Link to={`/stock/inventaires/${id}`} className="font-mono text-xs hover:underline">{move.reference}</Link>
+  if (type === 'delivery') return <span className="font-mono text-xs">{move.reference}</span>
   if (type === 'transfer') return <Link to={`/stock?vue=transferts&transfert=${id}`} className="font-mono text-xs hover:underline">{move.reference}</Link>
   if (move.reference) return <span className="font-mono text-xs">{move.reference}</span>
   return <span className="text-xs text-muted-foreground">{move.reason ? ADJUST_REASONS[move.reason as keyof typeof ADJUST_REASONS] ?? move.reason : '—'}</span>

@@ -70,6 +70,8 @@ class StockRow(Schema):
 
     article: ArticleBrief
     quantity: Decimal
+    reserved: Decimal  # promis sur des commandes client
+    available: Decimal  # quantité − réservé (négatif = rupture)
     average_cost: Decimal
     value: Decimal
     oldest_dot: str | None  # le DOT le plus ancien en stock (à sortir en premier)
@@ -111,6 +113,13 @@ class MovePage(Schema):
     total: int
 
 
+class SiteAvailability(Schema):
+    site: SiteBrief
+    quantity: Decimal
+    reserved: Decimal
+    available: Decimal
+
+
 class ArticleStock(Schema):
     """Le stock d'un article : où il est, quels DOT, à quel coût."""
 
@@ -118,6 +127,8 @@ class ArticleStock(Schema):
     quantity: Decimal
     average_cost: Decimal
     value: Decimal
+    reserved: Decimal
+    sites: list[SiteAvailability]
     levels: list[LevelRead]  # triés dépôt, emplacement, puis DOT du plus ancien au plus récent
     moves: list[MoveRead]  # les derniers mouvements
 

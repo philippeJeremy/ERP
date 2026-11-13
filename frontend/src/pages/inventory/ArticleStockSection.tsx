@@ -38,7 +38,7 @@ export function ArticleStockSection({ articleId }: { articleId: number }) {
         <>
           <div className="mb-3 grid gap-3 sm:grid-cols-3">
             {[
-              ['En stock', fmtQty(s.quantity)],
+              ['En stock', Number(s.reserved) ? `${fmtQty(s.quantity)} (dont ${fmtQty(s.reserved)} réservés)` : fmtQty(s.quantity)],
               ['Coût moyen pondéré', fmtCost(s.average_cost)],
               ['Valeur du stock', fmtMoney(s.value)],
             ].map(([label, value]) => (
@@ -48,6 +48,16 @@ export function ArticleStockSection({ articleId }: { articleId: number }) {
               </div>
             ))}
           </div>
+          {s.sites.some((x) => Number(x.reserved)) && (
+            <div className="mb-3 flex flex-wrap gap-2 text-sm">
+              {s.sites.map((x) => (
+                <span key={x.site.id} className="rounded-lg border bg-card px-3 py-1.5">
+                  {x.site.name} : {fmtQty(x.quantity)} en stock, {fmtQty(x.reserved)} réservés,{' '}
+                  <b className={Number(x.available) < 0 ? 'text-destructive' : undefined}>{fmtQty(x.available)} disponibles</b>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="mb-4 overflow-x-auto rounded-xl border bg-card shadow-xs">
             <table className="w-full text-sm">
               <thead className="border-b bg-secondary/50 text-left text-xs text-muted-foreground">

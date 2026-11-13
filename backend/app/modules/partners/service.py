@@ -24,6 +24,8 @@ NOT_NULL_FIELDS = {
     "is_active",
     "payment_end_of_month",
     "currency",
+    "customer_payment_end_of_month",
+    "discount_pct",
 }
 
 
@@ -121,6 +123,8 @@ def create_partner(db: Session, data: PartnerCreate) -> Partner:
     values = data.model_dump()
     # Pas de code saisi : le prochain numéro du compteur de la société (T00042).
     values["code"] = data.code or org.next_number(db, "partner")
+    if data.is_customer and not data.customer_kind:
+        values["customer_kind"] = "pro"
     partner = Partner(**values)
     db.add(partner)
     db.commit()
@@ -147,6 +151,8 @@ def update_partner(db: Session, partner_id: int, data: PartnerUpdate) -> Partner
         _check_parent(db, changes["parent_id"], partner.id)
     for field, value in changes.items():
         setattr(partner, field, value)
+    if partner.is_customer and not partner.customer_kind:
+        partner.customer_kind = "pro"
     db.commit()
     return partner
 

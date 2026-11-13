@@ -22,6 +22,7 @@ from app.modules.inventory.models import (
     Count,
     CountLine,
     Location,
+    Reservation,
     StockLevel,
     StockMove,
     Transfer,
@@ -42,6 +43,7 @@ from app.modules.inventory.schemas import (
     LocationIn,
     MovePage,
     MoveRead,
+    SiteAvailability,
     SiteBrief,
     StockPage,
     StockRow,
@@ -629,6 +631,123 @@ def get_count(db: Session, count_id: int) -> CountRead:
     )
 
 
+# --- Réservations, disponible et sorties (appelés par le module ventes) ---------------
+
+
+@dataclass
+class Availability:
+    on_hand: Decimal  # en stock
+    reserved: Decimal  # promis aux clients
+    available: Decimal  # en stock − promis (négatif = rupture)
+
+
+def availability(
+    db: Session, article_ids: set[int], site_id: int | None
+) -> dict[int, Availability]:
+    on_hand = repo.on_hand_by(db, article_ids, site_id)
+    reserved = repo.reserved_by(db, article_ids, site_id)
+    result = {}
+    for article_id in article_ids:
+        h = Decimal(on_hand.get(article_id, 0))
+        r = Decimal(reserved.get(article_id, 0))
+        result[article_id] = Availability(on_hand=h, reserved=r, available=h - r)
+    return result
+
+
+def set_reservation(
+    db: Session,
+    *,
+    source: str,
+    article_id: int,
+    site_id: int,
+    quantity: Decimal,
+    reference: str | None = None,
+) -> None:
+    """Fixe la quantité réservée pour `source` (une ligne de commande) ; 0 = supprime.
+    NE COMMITE PAS."""
+    reservation = repo.get_reservation(db, source)
+    if quantity <= 0:
+        if reservation is not None:
+            db.delete(reservation)
+            db.flush()
+        return
+    if reservation is None:
+        reservation = Reservation(source=source)
+        db.add(reservation)
+    reservation.article_id = article_id
+    reservation.site_id = site_id
+    reservation.quantity = quantity
+    reservation.reference = reference
+    db.flush()
+
+
+def average_costs(db: Session, article_ids: set[int]) -> dict[int, Decimal]:
+    """CMP des articles (0 si jamais entré en stock)."""
+    costs = repo.costs_of(db, article_ids)
+    return {a: costs.get(a, Decimal(0)) for a in article_ids}
+
+
+def location_codes(db: Session, ids: set[int]) -> dict[int, str]:
+    return {i: x.code for i, x in repo.locations_by_ids(db, ids).items()}
+
+
+@dataclass
+class IssuedLot:
+    location_id: int
+    location_code: str
+    dot: str
+    quantity: Decimal
+    unit_cost: Decimal
+
+
+def issue(
+    db: Session,
+    *,
+    article_id: int,
+    site_id: int,
+    quantity: Decimal,
+    location_id: int | None,
+    dot: str | None,
+    source: str,
+    reference: str,
+) -> list[IssuedLot]:
+    """Sortie de stock d'une livraison : les DOT les plus anciens d'abord (sauf DOT ou
+    emplacement imposé). NE COMMITE PAS. Refuse s'il n'y a pas assez de stock physique."""
+    _lock_cost(db, article_id)  # même ordre de verrous que les autres mouvements
+    levels = repo.site_levels_fifo(db, site_id, article_id, location_id, dot)
+    available = sum((x.quantity for x in levels), Decimal(0))
+    if available < quantity:
+        article = catalog.article_brief(catalog.get_article(db, article_id))
+        where = f" (DOT {dot})" if dot else ""
+        raise InsufficientStock(
+            f"Stock insuffisant pour {article.code}{where} : {_qty(available)} en stock "
+            f"dans le dépôt, {_qty(quantity)} à livrer"
+        )
+    locations = repo.locations_by_ids(db, {x.location_id for x in levels})
+    lots: list[IssuedLot] = []
+    remaining = quantity
+    for level in levels:
+        if remaining <= 0:
+            break
+        take = min(level.quantity, remaining)
+        remaining -= take
+        location = locations[level.location_id]
+        move = _move(
+            db,
+            _Move(
+                kind="livraison",
+                article_id=article_id,
+                location=location,
+                dot=level.dot,
+                quantity=-take,
+                source=source,
+                reference=reference,
+            ),
+        )
+        lots.append(IssuedLot(location.id, location.code, level.dot, take, move.unit_cost))
+    return lots
+
+
 # --- Lecture ---------------------------------------------------------------------------
 
 
@@ -685,11 +804,14 @@ def stock(
         offset=offset,
     )
     briefs = catalog.article_briefs(db, [r[0] for r in rows])
+    reserved = repo.reserved_by(db, {r[0] for r in rows}, site_id)
     return StockPage(
         items=[
             StockRow(
                 article=briefs[article_id],
                 quantity=quantity,
+                reserved=Decimal(reserved.get(article_id, 0)),
+                available=quantity - Decimal(reserved.get(article_id, 0)),
                 average_cost=cost,
                 value=Decimal(value).quantize(CENT, rounding=ROUND_HALF_UP),
                 oldest_dot=oldest[2:] + oldest[:2] if oldest else None,
@@ -712,6 +834,19 @@ def article_stock(db: Session, article_id: int) -> ArticleStock:
     )
     quantity = sum((x.quantity for x in levels), Decimal(0))
     cost = repo.get_cost(db, article_id)
+    reserved = repo.reserved_by_site(db, article_id)
+    per_site: dict[int, Decimal] = {}
+    for x in levels:
+        per_site[x.site_id] = per_site.get(x.site_id, Decimal(0)) + x.quantity
+    site_rows = [
+        SiteAvailability(
+            site=sites[site],
+            quantity=per_site.get(site, Decimal(0)),
+            reserved=Decimal(reserved.get(site, 0)),
+            available=per_site.get(site, Decimal(0)) - Decimal(reserved.get(site, 0)),
+        )
+        for site in sorted(set(per_site) | set(reserved), key=lambda i: sites[i].code)
+    ]
     moves, _ = repo.search_moves(
         db, article_id=article_id, site_id=None, kind=None, source=None, articles=None,
         limit=20, offset=0,
@@ -721,6 +856,8 @@ def article_stock(db: Session, article_id: int) -> ArticleStock:
         quantity=quantity,
         average_cost=cost,
         value=(quantity * cost).quantize(CENT, rounding=ROUND_HALF_UP),
+        reserved=sum((r.reserved for r in site_rows), Decimal(0)),
+        sites=site_rows,
         levels=[
             LevelRead(
                 site=sites[x.site_id],
